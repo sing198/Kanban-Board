@@ -962,31 +962,7 @@ export default function Board() {
     login(bId);
   }, [login]);
 
-  // Intercept Browser Back Button (<) and Tab Closing (X) for Guest Users
-  useEffect(() => {
-    if (!user || user.email !== "guest@kanban.demo" || !isOwner) return;
 
-    window.history.pushState(null, "", window.location.href);
-
-    const handlePopState = () => {
-      window.history.pushState(null, "", window.location.href);
-      setShowGuestExitModal(true);
-    };
-
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isLoggingInRef.current) return;
-      e.preventDefault();
-      e.returnValue = "You have unsaved changes in Guest Mode. Sign in to save your board permanently.";
-      return e.returnValue;
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [user]);
 
   // Access Request & Notifications System
   const { notifications, unreadCount, requestAccess, respondToAccess } = useNotifications();
@@ -1023,6 +999,46 @@ export default function Board() {
       isOwner ||
       canEditIfLoggedIn
     );
+
+  // Intercept Browser Back Button (<) and Tab Closing (X) for Guest Owners
+  useEffect(() => {
+    if (!user || user.email !== "guest@kanban.demo" || !isOwner) return;
+
+    window.history.pushState(null, "", window.location.href);
+
+    const handlePopState = () => {
+      window.history.pushState(null, "", window.location.href);
+      setShowGuestExitModal(true);
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isLoggingInRef.current) return;
+      e.preventDefault();
+      e.returnValue = "You have unsaved changes in Guest Mode. Sign in to save your board permanently.";
+      return e.returnValue;
+    };
+
+    const handleUnload = () => {
+      if (isLoggingInRef.current) return;
+      const token = localStorage.getItem("kanban_jwt");
+      if (boardId && token) {
+        fetch(`${API_URL}/api/boards/${boardId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+          keepalive: true,
+        });
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("unload", handleUnload);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("unload", handleUnload);
+    };
+  }, [user, isOwner, boardId]);
 
   const toggleSwimlane = (swim: string) => setCollapsedSwimlanes((prev) => ({ ...prev, [swim]: !prev[swim] }));
 
