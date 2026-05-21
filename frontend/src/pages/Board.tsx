@@ -956,6 +956,31 @@ export default function Board() {
     }
   }, [isShareModalOpen, fetchBoardMembers]);
 
+  // Intercept Browser Back Button (<) and Tab Closing (X) for Guest Users
+  useEffect(() => {
+    if (!user || user.email !== "guest@kanban.demo") return;
+
+    window.history.pushState(null, "", window.location.href);
+
+    const handlePopState = () => {
+      window.history.pushState(null, "", window.location.href);
+      setShowGuestExitModal(true);
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "You have unsaved changes in Guest Mode. Sign in to save your board permanently.";
+      return e.returnValue;
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [user]);
+
   // Access Request & Notifications System
   const { notifications, unreadCount, requestAccess, respondToAccess } = useNotifications();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -2470,9 +2495,20 @@ export default function Board() {
                 <Check size={15} /> Sign In to Save Board
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setShowGuestExitModal(false);
-                  navigate("/");
+                  const token = localStorage.getItem("kanban_jwt");
+                  if (boardId && token) {
+                    try {
+                      await fetch(`${API_URL}/api/boards/${boardId}`, {
+                        method: "DELETE",
+                        headers: { Authorization: `Bearer ${token}` },
+                      });
+                    } catch (err) {
+                      console.error("Failed deleting guest board:", err);
+                    }
+                  }
+                  navigate("/", { replace: true });
                 }}
                 className="w-full py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold rounded-xl border border-rose-500/30 transition-all cursor-pointer flex items-center justify-center gap-1.5"
               >

@@ -80,6 +80,26 @@ func cleanupTickets() {
 	}
 }
 
+func startGuestBoardCleanupWorker(db *gorm.DB) {
+	ticker := time.NewTicker(1 * time.Hour)
+	for range ticker.C {
+		cutoff := time.Now().Add(-24 * time.Hour)
+		var guestUser User
+		if err := db.Where("email = ?", "guest@kanban.demo").First(&guestUser).Error; err == nil {
+			var oldBoards []Board
+			if err := db.Where("owner_id = ? AND created_at < ?", guestUser.ID, cutoff).Find(&oldBoards).Error; err == nil {
+				for _, b := range oldBoards {
+					db.Where("board_id = ?", b.ID).Delete(&Card{})
+					db.Where("board_id = ?", b.ID).Delete(&BoardMember{})
+					db.Where("board_id = ?", b.ID).Delete(&AccessRequest{})
+					db.Where("id = ?", b.ID).Delete(&Board{})
+					log.Printf("🧹 Cleaned up expired guest board %s (older than 24h)\n", b.ID)
+				}
+			}
+		}
+	}
+}
+
 type IPRateLimiter struct {
 	mu       sync.Mutex
 	requests map[string][]time.Time
@@ -183,6 +203,9 @@ func main() {
 
 	// Initialize Database
 	db := InitDB()
+
+	// Start 24-hour Guest Board Garbage Collection Worker
+	go startGuestBoardCleanupWorker(db)
 
 	// Initialize OAuth
 	InitOAuth()
