@@ -11,6 +11,7 @@ data/
 
 # Build & Executables
 *.exe
+*.exe~
 main
 dist/
 node_modules/
@@ -23,3 +24,6 @@ backend/main
 .idea/
 .zcode/
 *.log
+implementation_plan.md
+update.md
+walkthrough.md
