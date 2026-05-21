@@ -1,0 +1,51 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: realtime_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: realtime_backend
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis:6379
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:80,http://localhost:8080
+      - JWT_SECRET=${JWT_SECRET:-antigravity_secret_key_change_in_prod}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+    volumes:
+      - backenddata:/app/data
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: realtime_frontend
+    restart: always
+    ports:
+      - "80:80"
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  redisdata:
+  backenddata:
