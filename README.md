@@ -1,4 +1,4 @@
-# 🚀 Realtime Board - Enterprise-Grade Collaborative Kanban & Miro Clone
+# 🚀 Kanban Board - Real-Time Collaborative Workspace
 
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://golang.org)
 [![React](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
@@ -8,7 +8,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com)
 [![NGINX](https://img.shields.io/badge/NGINX-Reverse_Proxy-009639?style=for-the-badge&logo=nginx&logoColor=white)](https://nginx.org)
 
-**Realtime Board** is a high-performance, full-stack, real-time collaborative workspace inspired by Miro and Trello. Engineered with a concurrent **Go (Gin) WebSocket** backend, **Redis Pub/Sub** horizontal scaling, and a modern **React 19 + TypeScript** glassmorphic frontend.
+**Kanban Board** is a high-performance, full-stack, real-time collaborative workspace. Engineered with a concurrent **Go (Gin) WebSocket** backend, **Redis Pub/Sub** horizontal scaling, and a modern **React 19 + TypeScript** glassmorphic frontend.
 
 ---
 
@@ -18,22 +18,22 @@
 - **Zero-Latency WebSocket Engine**: Instant card dragging/moving, column management, swimlane creation, and real-time tag updates across all connected clients.
 - **Live User Presence**: Real-time online user avatar stack on board header and dashboard cards with automated presence tracking.
 
-### 🛡️ Miro-Style Access Control & Notification System
-- **Role-Based Access (RBAC)**: Owner, Editor, and Viewer permission tiers.
+### 🛡️ Granular Access Control & Notification System
+- **Role-Based Access Control (RBAC)**: Owner, Editor, and Viewer permission tiers.
 - **Access Request Flow**: Viewers can request editor rights (`Request editor rights`). Board owners receive instant WebSocket notifications via a floating Notification Bell (`🔔`).
-- **Manage Board Access Panel**: Detailed modal allowing board owners to upgrade or downgrade user permissions in real time.
+- **Manage Access Panel**: Dedicated modal allowing board owners to upgrade or downgrade user permissions in real time.
 
-### 📋 Rich Task Inspector & Inspector Modal
+### 📋 Interactive Task Inspector
 - **Glassmorphic Detail Modal**: Comprehensive inspector for task details, descriptions, due dates, and interactive checklists.
 - **Checklist Progress Bar**: Real-time visual progress percentage (`✓ 2/4` - `67%`) on checklists.
 - **Dynamic Due Date Badges**: Automatic visual badges (*Overdue*, *Due Soon*, *On Track*).
 - **Swimlane Reassignment**: Reassign cards across swimlanes directly from task details or canvas drag-and-drop.
 
-### 🎨 Adaptive Aesthetic & Customization
-- **Dual-Mode Theme Engine**: Seamless switching between Dark Mode and Light Mode with HSL tailored color palettes.
+### 🎨 Adaptive Aesthetic Engine
+- **Dual-Mode Theme System**: Seamless switching between Dark Mode and Light Mode with tailored HSL color palettes.
 - **6 Wallpaper Presets**: Real-time background wallpaper synchronization (*Clean Slate, Cyberpunk Midnight, Sunset Amber, Emerald Aurora, Ocean Breeze, Pastel Lavender*).
 
-### 🚀 Security & Enterprise Reliability
+### 🚀 Security & Reliability
 - **Ticket-Based WebSocket Authentication**: One-time secure tickets for WebSocket connection handshake to prevent unauthorized access.
 - **Sliding-Window Rate Limiter**: Thread-safe IP rate limiting (120 requests/minute per IP) with automatic background memory reclamation.
 - **Database Optimizations**: Batch SQL query execution eliminating N+1 query bottlenecks.
@@ -41,7 +41,7 @@
 
 ---
 
-## 🛠️ Architecture & Tech Stack
+## 🛠️ Tech Stack & System Architecture
 
 | Layer | Technology | Key Responsibilities |
 | :--- | :--- | :--- |
@@ -49,7 +49,7 @@
 | **Backend** | Go (Golang 1.23+), Gin Framework, GORM | RESTful APIs, WebSocket Hub, JWT Authentication, One-Time WS Ticket Engine, IP Rate Limiter |
 | **Real-Time Scaling** | Redis 7 (Pub/Sub) | Cross-instance WebSocket message broadcasting for multi-node deployment |
 | **Database** | SQLite3 / PostgreSQL | Relational storage for users, boards, columns, cards, swimlanes, and access requests |
-| **DevOps** | Multi-stage Docker, NGINX | Production containerization, SPA routing, Reverse Proxying `/api`, `/auth`, and WebSocket `/ws` |
+| **DevOps** | Multi-stage Docker, NGINX | Containerization, SPA routing, Reverse Proxying `/api`, `/auth`, and WebSocket `/ws` |
 
 ---
 
@@ -59,15 +59,15 @@ The entire production stack (Backend, Frontend, NGINX Reverse Proxy, Redis) can 
 
 ```bash
 # Clone repository
-git clone https://github.com/YOUR_USERNAME/realtime-board.git
-cd realtime-board
+git clone https://github.com/YOUR_USERNAME/kanban-board.git
+cd kanban-board
 
 # Launch full containerized stack
 docker-compose up -d --build
 ```
 
 Access the application in your browser:
-- **Web App (NGINX Proxy)**: `http://localhost` or `http://localhost:5173`
+- **Web Application**: `http://localhost` or `http://localhost:5173`
 - **Backend API**: `http://localhost:8080`
 
 ---
@@ -103,7 +103,7 @@ Frontend runs locally at `http://localhost:5173`.
 ## 📁 Directory Structure
 
 ```
-realtime-board/
+kanban-board/
 ├── backend/
 │   ├── client.go           # WebSocket Client & Message Validation
 │   ├── hub.go              # WebSocket Room Hub & Redis Pub/Sub Sync
@@ -114,7 +114,7 @@ realtime-board/
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── Board.tsx   # Miro Canvas Workspace, Modal Inspectors, Wallpapers
+│   │   │   ├── Board.tsx   # Canvas Workspace, Modal Inspectors, Wallpapers
 │   │   │   └── Dashboard.tsx # Board Grid/List Views, Custom Modals, Avatars
 │   │   ├── useWebSocket.ts # Real-Time Action Hooks & State Sync
 │   │   ├── useAuth.tsx     # JWT & Google OAuth State Management
@@ -122,7 +122,7 @@ realtime-board/
 │   ├── nginx.conf          # NGINX SPA & Reverse Proxy Configuration
 │   └── Dockerfile          # Multi-stage Node & NGINX Build
 ├── docker-compose.yml      # Docker Orchestration Manifest
-├── implementation_plan.md  # Comprehensive Architectural & System Update Documentation
+├── implementation_plan.md  # Comprehensive Architectural Documentation
 └── README.md
 ```
 
@@ -131,7 +131,3 @@ realtime-board/
 ## 🛡️ License
 
 Distributed under the MIT License. See `LICENSE` for details.
-
----
-
-Designed & Developed by **LO** (Full-Stack Engineer) ⚡
