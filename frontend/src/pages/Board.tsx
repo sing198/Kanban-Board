@@ -956,6 +956,12 @@ export default function Board() {
     }
   }, [isShareModalOpen, fetchBoardMembers]);
 
+  const isLoggingInRef = useRef(false);
+  const handleLogin = useCallback((bId: string) => {
+    isLoggingInRef.current = true;
+    login(bId);
+  }, [login]);
+
   // Intercept Browser Back Button (<) and Tab Closing (X) for Guest Users
   useEffect(() => {
     if (!user || user.email !== "guest@kanban.demo") return;
@@ -968,6 +974,7 @@ export default function Board() {
     };
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isLoggingInRef.current) return;
       e.preventDefault();
       e.returnValue = "You have unsaved changes in Guest Mode. Sign in to save your board permanently.";
       return e.returnValue;
@@ -1317,7 +1324,7 @@ export default function Board() {
                     )
                   ) : (
                     <button
-                      onClick={() => login(boardId || "")}
+                      onClick={() => handleLogin(boardId || "")}
                       className="w-full py-2 bg-[#4262ff] hover:bg-[#3551d8] text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-blue-500/20 cursor-pointer"
                     >
                       Log in to Request
@@ -1464,7 +1471,7 @@ export default function Board() {
             </div>
           ) : (
             <button
-              onClick={() => login(boardId || "")}
+              onClick={() => handleLogin(boardId || "")}
               className="px-3.5 py-1.5 bg-[#4262ff] hover:bg-[#3551d8] text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/20"
             >
               Sign In
@@ -1639,7 +1646,7 @@ export default function Board() {
               </div>
             </div>
             <button
-              onClick={() => login(boardId || "")}
+              onClick={() => handleLogin(boardId || "")}
               className="px-4 py-2 bg-[#4262ff] hover:bg-[#3551d8] text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-blue-500/20 flex-shrink-0 cursor-pointer"
             >
               Log in to Edit
@@ -2440,7 +2447,7 @@ export default function Board() {
 
             <div className="flex flex-col gap-2.5">
               <button
-                onClick={() => login(boardId || "")}
+                onClick={() => handleLogin(boardId || "")}
                 className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Globe size={15} /> Continue with Google
@@ -2489,7 +2496,7 @@ export default function Board() {
 
             <div className="flex flex-col gap-2.5">
               <button
-                onClick={() => login(boardId || "")}
+                onClick={() => handleLogin(boardId || "")}
                 className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Check size={15} /> Sign In to Save Board
