@@ -32,13 +32,35 @@ function parseJwt(token: string) {
 const TOKEN_KEY = "kanban_jwt";
 
 export function useAuth() {
+  // Read initial token: real Google tokens from localStorage, Guest tokens from sessionStorage
   const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem(TOKEN_KEY);
+    // Purge any legacy guest tokens from localStorage
+    const localSaved = localStorage.getItem(TOKEN_KEY);
+    if (localSaved) {
+      const payload = parseJwt(localSaved);
+      if (payload && (payload.email === "guest@kanban.demo" || payload.sub === "guest")) {
+        localStorage.removeItem(TOKEN_KEY);
+      } else {
+        return localSaved;
+      }
+    }
+    // Read session-only token for Guest
+    const sessionSaved = sessionStorage.getItem(TOKEN_KEY);
+    if (sessionSaved) {
+      const payload = parseJwt(sessionSaved);
+      if (payload && !payload.exp || (payload.exp * 1000 > Date.now())) {
+        return sessionSaved;
+      } else {
+        sessionStorage.removeItem(TOKEN_KEY);
+      }
+    }
+    return null;
   });
+
   const [user, setUser] = useState<User | null>(() => {
-    const savedToken = localStorage.getItem(TOKEN_KEY);
-    if (!savedToken) return null;
-    const payload = parseJwt(savedToken);
+    const activeToken = token || sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
+    if (!activeToken) return null;
+    const payload = parseJwt(activeToken);
     const isExpired = payload && payload.exp && payload.exp * 1000 < Date.now();
     if (payload && payload.sub && !isExpired) {
       return {
@@ -50,6 +72,7 @@ export function useAuth() {
     }
     return null;
   });
+
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Consume a token from the URL (?token=...) once, on mount.
@@ -57,6 +80,7 @@ export function useAuth() {
     const urlToken = searchParams.get("token");
     if (!urlToken) return;
 
+    // Real Google OAuth tokens go to localStorage (persistent)
     localStorage.setItem(TOKEN_KEY, urlToken);
     setToken(urlToken);
 
@@ -64,7 +88,6 @@ export function useAuth() {
     const next = new URLSearchParams(searchParams);
     next.delete("token");
     setSearchParams(next, { replace: true });
-    // We intentionally only run this on mount to grab the URL token.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -74,7 +97,9 @@ export function useAuth() {
         const res = await fetch(`${API_URL}/api/auth/guest`, { method: "POST" });
         if (res.ok) {
           const data = await res.json();
-          localStorage.setItem(TOKEN_KEY, data.token);
+          // Store Guest tokens ONLY in sessionStorage so they auto-expire when tab closes!
+          sessionStorage.setItem(TOKEN_KEY, data.token);
+          localStorage.removeItem(TOKEN_KEY);
           setToken(data.token);
           if (data.user) {
             setUser({

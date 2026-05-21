@@ -818,7 +818,7 @@ export default function Board() {
   const { user, login, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  const token = localStorage.getItem("kanban_jwt");
+  const token = (sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"));
 
   const {
     cards,
@@ -934,7 +934,7 @@ export default function Board() {
 
   const fetchBoardMembers = useCallback(async () => {
     if (!boardId) return;
-    const token = localStorage.getItem("kanban_jwt");
+    const token = (sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"));
     if (!token) return;
     try {
       const res = await fetch(`${API_URL}/api/boards/${boardId}/members`, {
@@ -1020,7 +1020,7 @@ export default function Board() {
 
     const handleUnload = () => {
       if (isLoggingInRef.current) return;
-      const token = localStorage.getItem("kanban_jwt");
+      const token = (sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"));
       if (boardId && token) {
         fetch(`${API_URL}/api/boards/${boardId}`, {
           method: "DELETE",
@@ -1480,7 +1480,7 @@ export default function Board() {
               <button
                 onClick={async () => {
                   if (user?.email === "guest@kanban.demo" && boardId && isOwner) {
-                    const token = localStorage.getItem("kanban_jwt");
+                    const token = (sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"));
                     if (token) {
                       try {
                         await fetch(`${API_URL}/api/boards/${boardId}`, {
@@ -2270,7 +2270,7 @@ export default function Board() {
                                   );
 
                                   // 2. ยิง API บันทึกลง Database
-                                  const token = localStorage.getItem("kanban_jwt");
+                                  const token = (sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"));
                                   if (!token) return;
 
                                   try {
@@ -2522,7 +2522,7 @@ export default function Board() {
               <button
                 onClick={async () => {
                   setShowGuestExitModal(false);
-                  const token = localStorage.getItem("kanban_jwt");
+                  const token = (sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"));
                   if (boardId && token) {
                     try {
                       await fetch(`${API_URL}/api/boards/${boardId}`, {

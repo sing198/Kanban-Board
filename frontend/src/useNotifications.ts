@@ -21,7 +21,7 @@ export function useNotifications() {
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchNotifications = useCallback(async () => {
-    const token = localStorage.getItem("kanban_jwt");
+    const token = (sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"));
     if (!token || !user) return;
 
     try {
@@ -51,7 +51,7 @@ export function useNotifications() {
   }, [user, fetchNotifications]);
 
   const requestAccess = async (boardId: string): Promise<AccessRequestItem | null> => {
-    const token = localStorage.getItem("kanban_jwt");
+    const token = (sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"));
     if (!token) return null;
 
     try {
@@ -74,7 +74,7 @@ export function useNotifications() {
   };
 
   const respondToAccess = async (requestId: number, action: "approve" | "dismiss"): Promise<boolean> => {
-    const token = localStorage.getItem("kanban_jwt");
+    const token = (sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"));
     if (!token) return false;
 
     try {

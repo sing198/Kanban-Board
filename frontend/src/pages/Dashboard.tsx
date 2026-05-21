@@ -201,7 +201,7 @@ export default function Dashboard() {
       if (showLoading) setIsLoadingBoards(true);
       const res = await fetch(`${API_URL}/api/me/boards`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("kanban_jwt")}`,
+          Authorization: `Bearer ${(sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"))}`,
         },
       });
       if (res.ok) {
@@ -221,7 +221,7 @@ export default function Dashboard() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("kanban_jwt")}`,
+          Authorization: `Bearer ${(sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"))}`,
         },
         body: JSON.stringify({ name: "Untitled Board" }),
       });
@@ -250,7 +250,7 @@ export default function Dashboard() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("kanban_jwt")}`,
+          Authorization: `Bearer ${(sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"))}`,
         },
         body: JSON.stringify({ name: renameInputValue.trim() }),
       });
@@ -279,7 +279,7 @@ export default function Dashboard() {
       const res = await fetch(`${API_URL}/api/boards/${deleteModalData.boardId}`, {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("kanban_jwt")}`,
+          Authorization: `Bearer ${(sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"))}`,
         },
       });
       if (res.ok) {

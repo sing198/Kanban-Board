@@ -69,7 +69,7 @@ export function useWebSocket(boardId: string, token: string | null) {
 
   const fetchBoard = useCallback(async () => {
     try {
-      const jwtToken = localStorage.getItem("kanban_jwt");
+      const jwtToken = sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt");
       const headers: Record<string, string> = jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {};
 
       // 1. ดึงข้อมูล Board
