@@ -1478,7 +1478,18 @@ export default function Board() {
               />
               <span className={`text-xs font-semibold ${theme === "dark" ? "text-slate-200" : "text-slate-700"}`}>{user.name}</span>
               <button
-                onClick={() => {
+                onClick={async () => {
+                  if (user?.email === "guest@kanban.demo" && boardId && isOwner) {
+                    const token = localStorage.getItem("kanban_jwt");
+                    if (token) {
+                      try {
+                        await fetch(`${API_URL}/api/boards/${boardId}`, {
+                          method: "DELETE",
+                          headers: { Authorization: `Bearer ${token}` },
+                        });
+                      } catch (e) {}
+                    }
+                  }
                   logout();
                   navigate("/");
                 }}

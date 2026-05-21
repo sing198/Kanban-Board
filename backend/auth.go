@@ -257,6 +257,17 @@ func GuestLogin(db *gorm.DB) gin.HandlerFunc {
 			}
 		}
 
+		// Purge previous guest boards so fresh guest sessions start clean with 0 boards!
+		var oldGuestBoards []Board
+		if err := db.Where("owner_id = ?", user.ID).Find(&oldGuestBoards).Error; err == nil {
+			for _, b := range oldGuestBoards {
+				db.Where("board_id = ?", b.ID).Delete(&Card{})
+				db.Where("board_id = ?", b.ID).Delete(&BoardMember{})
+				db.Where("board_id = ?", b.ID).Delete(&AccessRequest{})
+				db.Where("id = ?", b.ID).Delete(&Board{})
+			}
+		}
+
 		jwtToken, err := GenerateJWT(user)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed generating token"})
