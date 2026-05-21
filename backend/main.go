@@ -218,6 +218,7 @@ func main() {
 	// Auth Routes
 	r.GET("/auth/google/login", GoogleLogin)
 	r.GET("/auth/google/callback", GoogleCallback(db))
+	r.POST("/api/auth/guest", GuestLogin(db))
 
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})

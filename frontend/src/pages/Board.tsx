@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   DndContext,
   closestCorners,
@@ -912,6 +912,9 @@ export default function Board() {
 
   const [addingToKey, setAddingToKey] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const navigate = useNavigate();
+  const [showGuestShareModal, setShowGuestShareModal] = useState(false);
+  const [showGuestExitModal, setShowGuestExitModal] = useState(false);
   const [isEditingBoardName, setIsEditingBoardName] = useState(false);
   const [tempBoardName, setTempBoardName] = useState("");
   const [collapsedSwimlanes, setCollapsedSwimlanes] = useState<Record<string, boolean>>({});
@@ -1160,8 +1163,14 @@ export default function Board() {
 
         {/* Header Left: Brand Logo & Board Title */}
         <div className="flex items-center gap-3">
-          <Link
-            to="/"
+          <div
+            onClick={() => {
+              if (!user || user.email === "guest@kanban.demo") {
+                setShowGuestExitModal(true);
+              } else {
+                navigate("/");
+              }
+            }}
             className="flex items-center gap-2 group cursor-pointer select-none"
             title="Go to Dashboard"
           >
@@ -1176,7 +1185,7 @@ export default function Board() {
             <span className="font-extrabold text-sm tracking-tight text-slate-800 dark:text-slate-100 group-hover:text-blue-500 transition-colors">
               Kanban
             </span>
-          </Link>
+          </div>
 
           <div className={`h-4 w-px ${theme === "dark" ? "bg-[#1e293b]" : "bg-gray-200"}`} />
 
@@ -1398,7 +1407,13 @@ export default function Board() {
           )}
 
           <button
-            onClick={() => setIsShareModalOpen(true)}
+            onClick={() => {
+              if (!user || user.email === "guest@kanban.demo") {
+                setShowGuestShareModal(true);
+              } else {
+                setIsShareModalOpen(true);
+              }
+            }}
             className={`px-4 py-1.5 rounded-xl text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${theme === "dark" ? "bg-[#2563eb] hover:bg-[#1d4ed8] shadow-md shadow-blue-500/20" : "bg-[#4262ff] hover:bg-[#3551d8] shadow-md shadow-blue-500/20"
               }`}
           >
@@ -2365,6 +2380,113 @@ export default function Board() {
             });
           }}
         />
+      )}
+
+      {/* Guest Share Prompt Modal */}
+      {showGuestShareModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className={`max-w-md w-full rounded-3xl p-6 border shadow-2xl relative overflow-hidden ${
+            theme === "dark" 
+              ? "bg-[#1e293b]/95 border-[#334155] text-slate-100 shadow-blue-950/40" 
+              : "bg-white/95 border-gray-200 text-slate-900 shadow-slate-400/20"
+          }`}>
+            <div className="absolute -top-16 -right-16 w-36 h-36 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex items-center justify-between mb-4 relative z-10">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 p-[1.5px] shadow-lg shadow-blue-500/20">
+                <div className="w-full h-full bg-[#0f172a] rounded-[14px] flex items-center justify-center text-blue-400">
+                  <UserPlus size={20} />
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowGuestShareModal(false)}
+                className="p-1 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <h3 className="text-lg font-extrabold tracking-tight mb-2">
+              Sign in to Share Board
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
+              You are currently exploring in <strong className="text-blue-500 font-semibold">Guest Mode</strong>. Sign in with your Google account to invite collaborators, manage editor rights, and generate real-time share links.
+            </p>
+
+            <div className="flex flex-col gap-2.5">
+              <button
+                onClick={() => login(boardId || "")}
+                className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Globe size={15} /> Continue with Google
+              </button>
+              <button
+                onClick={() => setShowGuestShareModal(false)}
+                className="w-full py-2 bg-transparent hover:bg-gray-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+              >
+                Keep Editing as Guest
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Guest Exit & Save Prompt Modal */}
+      {showGuestExitModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className={`max-w-md w-full rounded-3xl p-6 border shadow-2xl relative overflow-hidden ${
+            theme === "dark" 
+              ? "bg-[#1e293b]/95 border-[#334155] text-slate-100 shadow-rose-950/30" 
+              : "bg-white/95 border-gray-200 text-slate-900 shadow-slate-400/20"
+          }`}>
+            <div className="absolute -top-16 -right-16 w-36 h-36 bg-amber-500/20 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex items-center justify-between mb-4 relative z-10">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 p-[1.5px] shadow-lg shadow-amber-500/20">
+                <div className="w-full h-full bg-[#0f172a] rounded-[14px] flex items-center justify-center text-amber-400">
+                  <AlertCircle size={20} />
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowGuestExitModal(false)}
+                className="p-1 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <h3 className="text-lg font-extrabold tracking-tight mb-2">
+              Save Board Before Leaving?
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
+              You are using <strong className="text-amber-500 font-semibold">Guest Access</strong>. Connect your Google account now to save this board permanently under your dashboard, or exit to discard.
+            </p>
+
+            <div className="flex flex-col gap-2.5">
+              <button
+                onClick={() => login(boardId || "")}
+                className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Check size={15} /> Sign In to Save Board
+              </button>
+              <button
+                onClick={() => {
+                  setShowGuestExitModal(false);
+                  navigate("/");
+                }}
+                className="w-full py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold rounded-xl border border-rose-500/30 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Trash2 size={13} /> Exit & Discard Board
+              </button>
+              <button
+                onClick={() => setShowGuestExitModal(false)}
+                className="w-full py-1.5 bg-transparent hover:bg-gray-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-medium rounded-xl transition-all cursor-pointer"
+              >
+                Stay on Board
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

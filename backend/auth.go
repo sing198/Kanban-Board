@@ -219,6 +219,48 @@ func GoogleCallback(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+// GuestLogin creates or retrieves a guest user and returns a signed JWT token
+func GuestLogin(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var user User
+		email := "guest@kanban.demo"
+		result := db.Where("email = ?", email).First(&user)
+		if result.Error != nil {
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+				user = User{
+					GoogleID:  "guest_demo_user",
+					Email:     email,
+					Name:      "Guest User",
+					AvatarURL: "https://api.dicebear.com/7.x/bottts/svg?seed=Guest",
+				}
+				if err := db.Create(&user).Error; err != nil {
+					c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed creating guest user"})
+					return
+				}
+			} else {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + result.Error.Error()})
+				return
+			}
+		}
+
+		jwtToken, err := GenerateJWT(user)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed generating token"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"token": jwtToken,
+			"user": gin.H{
+				"id":        user.ID,
+				"email":     user.Email,
+				"name":      user.Name,
+				"avatarUrl": user.AvatarURL,
+			},
+		})
+	}
+}
+
 // BoardInviteClaims represents an invite link token carrying boardID and role (edit/view)
 type BoardInviteClaims struct {
 	BoardID string `json:"board_id"`
