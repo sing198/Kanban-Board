@@ -1,135 +1,98 @@
-# 🚀 Kanban Board - Real-Time Collaborative Workspace
+# Kanban Board
 
-[![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://golang.org)
-[![React](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![WebSocket](https://img.shields.io/badge/WebSocket-Realtime-FF6C37?style=for-the-badge&logo=socketdotio&logoColor=white)](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket)
-[![Redis](https://img.shields.io/badge/Redis-7_Pub/Sub-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com)
-[![NGINX](https://img.shields.io/badge/NGINX-Reverse_Proxy-009639?style=for-the-badge&logo=nginx&logoColor=white)](https://nginx.org)
+A real-time collaborative kanban board built with a Go backend and a React + TypeScript frontend. Cards, columns, and swimlanes sync instantly across everyone connected to a board over WebSockets, and Redis Pub/Sub is used so it can scale across multiple backend instances.
 
-**Kanban Board** is a high-performance, full-stack, real-time collaborative workspace. Engineered with a concurrent **Go (Gin) WebSocket** backend, **Redis Pub/Sub** horizontal scaling, and a modern **React 19 + TypeScript** glassmorphic frontend.
+## Features
 
----
+**Real-time sync**
+- Card moves, column changes, swimlane edits, and tag updates all push to every connected client immediately.
+- Card IDs are deduplicated between client and server so drag-and-drop doesn't create duplicate cards when multiple people move things at once.
+- Online user avatars show up on the board and dashboard, and stale guest sessions get filtered out so they don't linger.
 
-## ✨ Key Features & Latest Architectural Upgrades
+**Auth & guest mode**
+- Logged-in users authenticate via Google OAuth (JWT stored in `localStorage`). Guests get a temporary session stored in `sessionStorage` that clears when the tab closes.
+- If a guest signs in with Google partway through, their board gets automatically reassigned to their account instead of being lost.
+- Guests can't claim or overwrite boards that already belong to someone else.
 
-### ⚡ Real-Time Collaboration & Synchronization
-- **Zero-Latency WebSocket Engine**: Instant card dragging/moving, column management, swimlane creation, and real-time tag updates across all connected clients.
-- **Global Card ID Deduplication**: Strict client & server state synchronization ensuring cards remain unique across columns during concurrent drag-and-drop operations.
-- **Live User Presence Isolation**: Real-time online user avatar stack on board headers and dashboard cards, filtering out stale guest badges for logged-in accounts.
+**Leaving the board cleanly**
+- If a guest hits the browser back button, we intercept it (`popstate`) and ask if they want to save the board before leaving.
+- If they just close the tab, a `DELETE` request fires with `keepalive: true` so the board gets cleaned up even without a proper page unload.
+- A background worker also runs hourly and clears out any guest boards older than 24 hours, as a backstop.
 
-### 🔑 Dual-Storage Auth & Seamless Guest Demo Experience
-- **Dual-Storage Architecture**: Persistent Google OAuth JWT tokens in `localStorage` and temporary Guest Demo tokens in `sessionStorage` (auto-expired on tab closure).
-- **Auto-Claim Guest Boards**: When a Guest user decides to log in via Google, the Go backend automatically transfers ownership (`owner_id`) of their Guest board directly into their Google Account.
-- **Strict Ownership Guard**: Prevents Guest users from claiming or overwriting boards owned by other users.
+**Permissions**
+- Three roles: Owner, Editor, Viewer.
+- Guests have to log in with Google before they can request editor access — keeps random anonymous requests out.
+- Owners get a panel to approve, upgrade, or downgrade anyone's access.
 
-### 🛡️ Dual-Layer Exit Guarding & Garbage Collection
-- **Browser Back Button Interception (`popstate`)**: Intercepts browser Back Button clicks for Guest owners, prompting a glassmorphic *"Save Board Before Leaving?"* confirmation modal.
-- **Instant Unload Cleanup (`keepalive` fetch)**: Automatically issues an asynchronous `DELETE /api/boards/:id` request with `keepalive: true` when a Guest closes their browser tab (`X`).
-- **24-Hour Backend Garbage Collection**: Hourly background worker (`startGuestBoardCleanupWorker`) purging expired Guest demo boards older than 24 hours.
+**Task details**
+- Click into a card to see the description, due date, swimlane, and checklist.
+- Checklists show progress as you go (e.g. `2/4 - 67%`).
+- Modal buttons change label depending on whether you're viewing or editing as a guest.
 
-### 🛡️ Access Control & Notification System
-- **Role-Based Access Control (RBAC)**: Owner, Editor, and Viewer permission tiers.
-- **Identity-Guarded Access Requests**: Requires Guest users to log in with a Google account before requesting editor access, preventing anonymous spam requests.
-- **Manage Access Panel**: Dedicated modal allowing board owners to upgrade or downgrade user permissions in real time.
+## Stack
 
-### 📋 Interactive Task Inspector & UI Polish
-- **Glassmorphic Detail Modal**: Inspector for task descriptions, due dates, swimlanes, and interactive checklists.
-- **Checklist Progress Bar**: Real-time visual progress percentage (`✓ 2/4` - `67%`) on checklists.
-- **Dynamic Modal Labels**: Smart button labels (*"Keep Viewing as Guest"* vs *"Keep Editing as Guest"*) depending on Read-Only vs Editor permissions.
-- **Hard-Reset Logout**: `logout()` clears all session/local storage and performs a clean hard redirect to the landing page.
+- **Frontend:** React 19, TypeScript, Vite, Tailwind, Lucide icons
+- **Backend:** Go 1.23+, Gin, GORM
+- **Real-time:** WebSockets, Redis 7 Pub/Sub for cross-instance broadcasting
+- **Database:** SQLite by default, Postgres also supported
+- **Deployment:** Docker Compose, NGINX as reverse proxy / SPA router
 
----
+## Running it
 
-## 🛠️ Tech Stack & System Architecture
-
-| Layer | Technology | Key Responsibilities |
-| :--- | :--- | :--- |
-| **Frontend** | React 19, TypeScript, Vite, TailwindCSS, Lucide Icons | Responsive Glassmorphic UI, Optimistic State Updates, Custom Hooks (`useWebSocket`, `useAuth`, `useTheme`, `useNotifications`) |
-| **Backend** | Go (Golang 1.23+), Gin Framework, GORM | RESTful APIs, WebSocket Hub, JWT Authentication, One-Time WS Ticket Engine, IP Rate Limiter, Guest Cleanup Worker |
-| **Real-Time Scaling** | Redis 7 (Pub/Sub) | Cross-instance WebSocket message broadcasting for multi-node deployment |
-| **Database** | SQLite3 / PostgreSQL | Relational storage for users, boards, columns, cards, swimlanes, and access requests |
-| **DevOps** | Multi-stage Docker, NGINX | Containerization, SPA routing, Reverse Proxying `/api`, `/auth`, and WebSocket `/ws` |
-
----
-
-## 🚀 Quick Start (Docker Compose)
-
-The entire production stack (Backend, Frontend, NGINX Reverse Proxy, Redis) can be launched with a single command:
+Easiest way is Docker Compose — spins up backend, frontend, NGINX, and Redis together:
 
 ```bash
-# Clone repository
 git clone https://github.com/sing198/Kanban-Board.git
 cd Kanban-Board
-
-# Launch full containerized stack
 docker-compose up -d --build
 ```
 
-Access the application in your browser:
-- **Web Application**: `http://localhost` or `http://localhost:5173`
-- **Backend API**: `http://localhost:8080`
+Then open `http://localhost` (or `http://localhost:5173` if you're hitting the frontend dev server directly). The API runs on `http://localhost:8080`.
 
----
+### Running locally without Docker
 
-## 💻 Local Development Setup
-
-### 1. Backend Setup (Go)
+**Backend**
 ```bash
 cd backend
-
-# Copy environment template
 cp .env.example .env
-
-# Run database migrations and backend server
 go run .
 ```
-Backend runs locally at `http://localhost:8080`.
+Runs on `http://localhost:8080`.
 
-### 2. Frontend Setup (React)
+**Frontend**
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Start Vite dev server
 npm run dev
 ```
-Frontend runs locally at `http://localhost:5173`.
+Runs on `http://localhost:5173`.
 
----
-
-## 📁 Directory Structure
+## Project layout
 
 ```
 kanban-board/
 ├── backend/
-│   ├── auth.go             # OAuth Handlers, Guest Auth & Board Claiming Logic
-│   ├── client.go           # WebSocket Client & Defense-in-Depth Origin Checks
-│   ├── hub.go              # WebSocket Room Hub & Redis Pub/Sub Sync
-│   ├── main.go             # Gin Routes, Rate Limiter, Guest Cleanup Worker & API Controllers
-│   ├── models.go           # GORM Data Schemas (Board, Card, Column, Swimlane, AccessRequest)
-│   ├── rate_limiter_test.go# Rate Limiter Unit Tests
-│   └── Dockerfile          # Multi-stage Go Build
+│   ├── auth.go              # OAuth + guest auth, board claiming
+│   ├── client.go            # WebSocket client, origin checks
+│   ├── hub.go                # WebSocket hub, Redis pub/sub
+│   ├── main.go                # routes, rate limiter, cleanup worker
+│   ├── models.go             # GORM models
+│   ├── rate_limiter_test.go
+│   └── Dockerfile
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── Board.tsx   # Canvas Workspace, Popstate/Unload Listeners, Wallpapers
-│   │   │   └── Dashboard.tsx # Board Grid/List Views, Presence Filters, Custom Modals
-│   │   ├── useWebSocket.ts # Real-Time Action Hooks, Deduplication & State Sync
-│   │   ├── useAuth.ts      # Dual-Storage (sessionStorage/localStorage) Auth Hooks
-│   │   └── config.ts       # Environment & API Configurations
-│   ├── nginx.conf          # NGINX SPA & Reverse Proxy Configuration
-│   └── Dockerfile          # Multi-stage Node & NGINX Build
-├── docker-compose.yml      # Docker Orchestration Manifest
-├── implementation_plan.md  # Detailed Architectural & Implementation Log
+│   │   │   ├── Board.tsx      # board view, popstate/unload handling
+│   │   │   └── Dashboard.tsx  # board list/grid, access requests
+│   │   ├── useWebSocket.ts
+│   │   ├── useAuth.ts
+│   │   └── config.ts
+│   ├── nginx.conf
+│   └── Dockerfile
+├── docker-compose.yml
 └── README.md
 ```
 
----
+## License
 
-## 🛡️ License
-
-Distributed under the MIT License. See `LICENSE` for details.
+MIT — see `LICENSE`.
