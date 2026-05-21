@@ -356,19 +356,9 @@ export default function Dashboard() {
               className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold hover:from-blue-500 hover:to-indigo-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 hover:scale-[1.02] active:scale-[0.98] text-sm cursor-pointer"
             >
               <Sparkles size={16} />
-              ⚡ Instant Demo Access (Guest)
+              Guest
             </button>
           </div>
-
-          {/* Feature Micro-Badges */}
-          <div className="flex items-center justify-center gap-4 text-[11px] text-slate-400 pt-2 border-t border-slate-800/80 w-full">
-            <span className="flex items-center gap-1">⚡ Realtime</span>
-            <span className="text-slate-600">•</span>
-            <span className="flex items-center gap-1">🛡️ RBAC</span>
-            <span className="text-slate-600">•</span>
-            <span className="flex items-center gap-1">🎨 Custom Themes</span>
-          </div>
-
         </div>
       </div>
     );
