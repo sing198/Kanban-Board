@@ -1094,7 +1094,7 @@ export default function Board() {
         : targetCards.findIndex((c: any) => c.ID.toString() === overId);
 
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-        const reordered = arrayMove(targetCards, oldIndex, newIndex);
+        const reordered: any[] = arrayMove(targetCards, oldIndex, newIndex);
         const finalIdx = reordered.findIndex((c: any) => c.ID.toString() === activeId);
 
         if (finalIdx === 0) {

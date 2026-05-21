@@ -18,8 +18,25 @@ export type BoardState = Card[];
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected";
 
+const deduplicateAndSortCards = (cards: Card[]): Card[] => {
+  const map = new Map<string, Card>();
+  for (const c of cards) {
+    if (c && c.ID != null) {
+      map.set(String(c.ID), c);
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => (a.Position ?? 0) - (b.Position ?? 0));
+};
+
 export function useWebSocket(boardId: string, token: string | null) {
-  const [cards, setCards] = useState<BoardState>([]);
+  const [cards, setCardsState] = useState<Card[]>([]);
+  const setCards = useCallback((action: React.SetStateAction<Card[]>) => {
+    setCardsState((prev) => {
+      const next = typeof action === "function" ? action(prev) : action;
+      return deduplicateAndSortCards(next);
+    });
+  }, []);
+
   const [boardName, setBoardName] = useState<string>("Board");
   const [columns, setColumns] = useState<string[]>(["TODO", "DOING", "DONE"]);
   const [swimlanes, setSwimlanes] = useState<string[]>([]);
@@ -187,14 +204,13 @@ export function useWebSocket(boardId: string, token: string | null) {
         } else if (data.type === "REORDER" && Array.isArray(data.cards)) {
           const list = data.toList as string | undefined;
           setCards((prev) => {
-            const others = list ? prev.filter((c) => c.List !== list) : prev;
+            const incomingIds = new Set((data.cards as Card[]).map((c) => String(c.ID)));
+            const others = prev.filter((c) => !incomingIds.has(String(c.ID)));
             const incoming = (data.cards as Card[]).map((c) => ({
               ...c,
               List: list ?? c.List,
             }));
-            return [...others, ...incoming].sort(
-              (a, b) => (a.Position ?? 0) - (b.Position ?? 0)
-            );
+            return [...others, ...incoming];
           });
         } else if (data.type === "ADD_CARD" && data.card) {
           setCards((prev) => {
