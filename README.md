@@ -12,32 +12,33 @@
 
 ---
 
-## ✨ Key Features
+## ✨ Key Features & Latest Architectural Upgrades
 
 ### ⚡ Real-Time Collaboration & Synchronization
 - **Zero-Latency WebSocket Engine**: Instant card dragging/moving, column management, swimlane creation, and real-time tag updates across all connected clients.
-- **Live User Presence**: Real-time online user avatar stack on board header and dashboard cards with automated presence tracking.
+- **Global Card ID Deduplication**: Strict client & server state synchronization ensuring cards remain unique across columns during concurrent drag-and-drop operations.
+- **Live User Presence Isolation**: Real-time online user avatar stack on board headers and dashboard cards, filtering out stale guest badges for logged-in accounts.
 
-### 🛡️ Granular Access Control & Notification System
+### 🔑 Dual-Storage Auth & Seamless Guest Demo Experience
+- **Dual-Storage Architecture**: Persistent Google OAuth JWT tokens in `localStorage` and temporary Guest Demo tokens in `sessionStorage` (auto-expired on tab closure).
+- **Auto-Claim Guest Boards**: When a Guest user decides to log in via Google, the Go backend automatically transfers ownership (`owner_id`) of their Guest board directly into their Google Account.
+- **Strict Ownership Guard**: Prevents Guest users from claiming or overwriting boards owned by other users.
+
+### 🛡️ Dual-Layer Exit Guarding & Garbage Collection
+- **Browser Back Button Interception (`popstate`)**: Intercepts browser Back Button clicks for Guest owners, prompting a glassmorphic *"Save Board Before Leaving?"* confirmation modal.
+- **Instant Unload Cleanup (`keepalive` fetch)**: Automatically issues an asynchronous `DELETE /api/boards/:id` request with `keepalive: true` when a Guest closes their browser tab (`X`).
+- **24-Hour Backend Garbage Collection**: Hourly background worker (`startGuestBoardCleanupWorker`) purging expired Guest demo boards older than 24 hours.
+
+### 🛡️ Access Control & Notification System
 - **Role-Based Access Control (RBAC)**: Owner, Editor, and Viewer permission tiers.
-- **Access Request Flow**: Viewers can request editor rights (`Request editor rights`). Board owners receive instant WebSocket notifications via a floating Notification Bell (`🔔`).
+- **Identity-Guarded Access Requests**: Requires Guest users to log in with a Google account before requesting editor access, preventing anonymous spam requests.
 - **Manage Access Panel**: Dedicated modal allowing board owners to upgrade or downgrade user permissions in real time.
 
-### 📋 Interactive Task Inspector
-- **Glassmorphic Detail Modal**: Comprehensive inspector for task details, descriptions, due dates, and interactive checklists.
+### 📋 Interactive Task Inspector & UI Polish
+- **Glassmorphic Detail Modal**: Inspector for task descriptions, due dates, swimlanes, and interactive checklists.
 - **Checklist Progress Bar**: Real-time visual progress percentage (`✓ 2/4` - `67%`) on checklists.
-- **Dynamic Due Date Badges**: Automatic visual badges (*Overdue*, *Due Soon*, *On Track*).
-- **Swimlane Reassignment**: Reassign cards across swimlanes directly from task details or canvas drag-and-drop.
-
-### 🎨 Adaptive Aesthetic Engine
-- **Dual-Mode Theme System**: Seamless switching between Dark Mode and Light Mode with tailored HSL color palettes.
-- **6 Wallpaper Presets**: Real-time background wallpaper synchronization (*Clean Slate, Cyberpunk Midnight, Sunset Amber, Emerald Aurora, Ocean Breeze, Pastel Lavender*).
-
-### 🚀 Security & Reliability
-- **Ticket-Based WebSocket Authentication**: One-time secure tickets for WebSocket connection handshake to prevent unauthorized access.
-- **Sliding-Window Rate Limiter**: Thread-safe IP rate limiting (120 requests/minute per IP) with automatic background memory reclamation.
-- **Database Optimizations**: Batch SQL query execution eliminating N+1 query bottlenecks.
-- **Safe Swimlane & Card Protection**: Automatic card migration and zero-data-loss fallback on swimlane deletion.
+- **Dynamic Modal Labels**: Smart button labels (*"Keep Viewing as Guest"* vs *"Keep Editing as Guest"*) depending on Read-Only vs Editor permissions.
+- **Hard-Reset Logout**: `logout()` clears all session/local storage and performs a clean hard redirect to the landing page.
 
 ---
 
@@ -46,7 +47,7 @@
 | Layer | Technology | Key Responsibilities |
 | :--- | :--- | :--- |
 | **Frontend** | React 19, TypeScript, Vite, TailwindCSS, Lucide Icons | Responsive Glassmorphic UI, Optimistic State Updates, Custom Hooks (`useWebSocket`, `useAuth`, `useTheme`, `useNotifications`) |
-| **Backend** | Go (Golang 1.23+), Gin Framework, GORM | RESTful APIs, WebSocket Hub, JWT Authentication, One-Time WS Ticket Engine, IP Rate Limiter |
+| **Backend** | Go (Golang 1.23+), Gin Framework, GORM | RESTful APIs, WebSocket Hub, JWT Authentication, One-Time WS Ticket Engine, IP Rate Limiter, Guest Cleanup Worker |
 | **Real-Time Scaling** | Redis 7 (Pub/Sub) | Cross-instance WebSocket message broadcasting for multi-node deployment |
 | **Database** | SQLite3 / PostgreSQL | Relational storage for users, boards, columns, cards, swimlanes, and access requests |
 | **DevOps** | Multi-stage Docker, NGINX | Containerization, SPA routing, Reverse Proxying `/api`, `/auth`, and WebSocket `/ws` |
@@ -59,8 +60,8 @@ The entire production stack (Backend, Frontend, NGINX Reverse Proxy, Redis) can 
 
 ```bash
 # Clone repository
-git clone https://github.com/YOUR_USERNAME/kanban-board.git
-cd kanban-board
+git clone https://github.com/sing198/Kanban-Board.git
+cd Kanban-Board
 
 # Launch full containerized stack
 docker-compose up -d --build
@@ -105,24 +106,25 @@ Frontend runs locally at `http://localhost:5173`.
 ```
 kanban-board/
 ├── backend/
-│   ├── client.go           # WebSocket Client & Message Validation
+│   ├── auth.go             # OAuth Handlers, Guest Auth & Board Claiming Logic
+│   ├── client.go           # WebSocket Client & Defense-in-Depth Origin Checks
 │   ├── hub.go              # WebSocket Room Hub & Redis Pub/Sub Sync
-│   ├── main.go             # Gin Routes, Rate Limiter Middleware, Auth & API Controllers
+│   ├── main.go             # Gin Routes, Rate Limiter, Guest Cleanup Worker & API Controllers
 │   ├── models.go           # GORM Data Schemas (Board, Card, Column, Swimlane, AccessRequest)
 │   ├── rate_limiter_test.go# Rate Limiter Unit Tests
 │   └── Dockerfile          # Multi-stage Go Build
 ├── frontend/
 │   ├── src/
 │   │   ├── pages/
-│   │   │   ├── Board.tsx   # Canvas Workspace, Modal Inspectors, Wallpapers
-│   │   │   └── Dashboard.tsx # Board Grid/List Views, Custom Modals, Avatars
-│   │   ├── useWebSocket.ts # Real-Time Action Hooks & State Sync
-│   │   ├── useAuth.tsx     # JWT & Google OAuth State Management
+│   │   │   ├── Board.tsx   # Canvas Workspace, Popstate/Unload Listeners, Wallpapers
+│   │   │   └── Dashboard.tsx # Board Grid/List Views, Presence Filters, Custom Modals
+│   │   ├── useWebSocket.ts # Real-Time Action Hooks, Deduplication & State Sync
+│   │   ├── useAuth.ts      # Dual-Storage (sessionStorage/localStorage) Auth Hooks
 │   │   └── config.ts       # Environment & API Configurations
 │   ├── nginx.conf          # NGINX SPA & Reverse Proxy Configuration
 │   └── Dockerfile          # Multi-stage Node & NGINX Build
 ├── docker-compose.yml      # Docker Orchestration Manifest
-├── implementation_plan.md  # Comprehensive Architectural Documentation
+├── implementation_plan.md  # Detailed Architectural & Implementation Log
 └── README.md
 ```
 
