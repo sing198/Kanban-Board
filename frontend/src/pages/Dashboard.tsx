@@ -300,24 +300,61 @@ export default function Dashboard() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#060d0b] text-white flex items-center justify-center font-sans overflow-hidden p-6 relative selection:bg-[#00b493]/30">
-        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-[#00b493]/20 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-amber-500/10 rounded-full blur-[100px] pointer-events-none" />
-        <div className="max-w-md w-full glass-card p-10 flex flex-col items-center relative z-10 text-center border border-white/10 shadow-2xl rounded-3xl">
-          <div className="inline-flex items-center justify-center p-4 mb-6 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl shadow-2xl">
-            <Sparkles className="text-[#00d2ba] mr-3" size={32} />
-            <h1 className="text-3xl font-extrabold neon-text">
-              Kanban Board
-            </h1>
+      <div className="min-h-screen bg-gradient-to-br from-[#060b13] via-[#0b1329] to-[#060b13] text-white flex items-center justify-center font-sans overflow-hidden p-6 relative selection:bg-blue-500/30">
+        {/* Glowing Background Ambient Orbs */}
+        <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-blue-600/15 rounded-full blur-[140px] pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/3 w-[450px] h-[450px] bg-indigo-600/15 rounded-full blur-[120px] pointer-events-none" />
+
+        <div className="max-w-md w-full bg-[#0f172a]/80 backdrop-blur-2xl p-8 sm:p-10 flex flex-col items-center relative z-10 text-center border border-slate-700/50 shadow-2xl rounded-3xl gap-6">
+
+          {/* Logo Badge */}
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#2563eb] via-[#4f46e5] to-[#38bdf8] p-[2px] shadow-lg shadow-blue-500/30">
+              <div className="w-full h-full bg-[#0f172a] rounded-[14px] flex items-center justify-center p-2 gap-1">
+                <div className="w-2 h-full rounded-xs bg-gradient-to-b from-blue-400 to-blue-600 shadow-2xs" />
+                <div className="w-2 h-4/5 rounded-xs bg-gradient-to-b from-sky-300 to-indigo-500 shadow-2xs" />
+                <div className="w-2 h-3/5 rounded-xs bg-gradient-to-b from-indigo-400 to-purple-500 shadow-2xs" />
+              </div>
+            </div>
+            <div className="text-left">
+              <h1 className="text-2xl font-extrabold tracking-tight text-white flex items-center gap-2">
+                Kanban Board
+              </h1>
+            </div>
           </div>
-          <p className="text-slate-400 mb-10 text-sm">Sign in to access your Kanban boards.</p>
-          <button
-            onClick={() => login("default")}
-            className="w-full py-4 rounded-xl bg-white text-slate-900 font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-3 shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" /><path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
-            Continue with Google
-          </button>
+
+          <p className="text-slate-400 text-xs leading-relaxed max-w-xs">
+            Collaborative Kanban workspace with zero-latency WebSocket sync, custom swimlanes, and role-based permissions.
+          </p>
+
+          {/* Action Buttons Stack */}
+          <div className="w-full flex flex-col gap-3 pt-2">
+            <button
+              onClick={() => login("default")}
+              className="w-full py-3.5 px-4 rounded-xl bg-white text-slate-900 font-bold hover:bg-slate-100 transition-all flex items-center justify-center gap-3 shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] text-sm cursor-pointer"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" /><path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" /><path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" /><path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" /></svg>
+              Continue with Google
+            </button>
+
+            <button
+              onClick={() => login("guest")}
+              className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold hover:from-blue-500 hover:to-indigo-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 hover:scale-[1.02] active:scale-[0.98] text-sm cursor-pointer"
+            >
+              <Sparkles size={16} />
+              ⚡ Instant Demo Access (Guest)
+            </button>
+          </div>
+
+          {/* Feature Micro-Badges */}
+          <div className="flex items-center justify-center gap-4 text-[11px] text-slate-400 pt-2 border-t border-slate-800/80 w-full">
+            <span className="flex items-center gap-1">⚡ Realtime</span>
+            <span className="text-slate-600">•</span>
+            <span className="flex items-center gap-1">🛡️ RBAC</span>
+            <span className="text-slate-600">•</span>
+            <span className="flex items-center gap-1">🎨 Custom Themes</span>
+          </div>
+
         </div>
       </div>
     );
@@ -355,8 +392,8 @@ export default function Dashboard() {
           <button
             onClick={toggleTheme}
             className={`p-2.5 rounded-xl border transition-colors cursor-pointer ${theme === "dark"
-                ? "bg-[#1e293b] text-amber-400 hover:bg-[#334155] border-[#334155]"
-                : "bg-gray-100 text-slate-700 hover:bg-gray-200 border-gray-200"
+              ? "bg-[#1e293b] text-amber-400 hover:bg-[#334155] border-[#334155]"
+              : "bg-gray-100 text-slate-700 hover:bg-gray-200 border-gray-200"
               }`}
             title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
           >
@@ -366,8 +403,8 @@ export default function Dashboard() {
           <button
             onClick={createNewBoard}
             className={`px-4 py-2 rounded-xl text-white text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer ${theme === "dark"
-                ? "bg-[#2563eb] hover:bg-[#1d4ed8] shadow-md shadow-blue-500/20"
-                : "bg-[#4262ff] hover:bg-[#3551d8] shadow-md shadow-blue-500/20"
+              ? "bg-[#2563eb] hover:bg-[#1d4ed8] shadow-md shadow-blue-500/20"
+              : "bg-[#4262ff] hover:bg-[#3551d8] shadow-md shadow-blue-500/20"
               }`}
           >
             <Plus size={16} /> Create New Board
@@ -390,8 +427,8 @@ export default function Dashboard() {
             <button
               onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
               className={`p-2 rounded-xl border transition-all cursor-pointer relative ${theme === "dark"
-                  ? "bg-[#1e293b] text-slate-200 hover:bg-[#334155] border-[#334155]"
-                  : "bg-gray-100 text-slate-700 hover:bg-gray-200 border-gray-200"
+                ? "bg-[#1e293b] text-slate-200 hover:bg-[#334155] border-[#334155]"
+                : "bg-gray-100 text-slate-700 hover:bg-gray-200 border-gray-200"
                 }`}
               title="Notifications"
             >
@@ -434,8 +471,8 @@ export default function Dashboard() {
                       <div
                         key={item.id}
                         className={`p-3 rounded-xl border transition-all ${item.status === "pending"
-                            ? theme === "dark" ? "bg-blue-950/20 border-blue-800/40" : "bg-blue-50/50 border-blue-100"
-                            : theme === "dark" ? "bg-slate-900/40 border-slate-800" : "bg-gray-50 border-gray-100"
+                          ? theme === "dark" ? "bg-blue-950/20 border-blue-800/40" : "bg-blue-50/50 border-blue-100"
+                          : theme === "dark" ? "bg-slate-900/40 border-slate-800" : "bg-gray-50 border-gray-100"
                           }`}
                       >
                         <div className="flex items-start gap-2.5">
@@ -489,8 +526,8 @@ export default function Dashboard() {
           <button
             onClick={logout}
             className={`p-2 rounded-xl border transition-colors ${theme === "dark"
-                ? "bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-transparent"
-                : "bg-gray-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border-gray-200"
+              ? "bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-transparent"
+              : "bg-gray-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border-gray-200"
               }`}
             title="Logout"
           >
@@ -512,8 +549,8 @@ export default function Dashboard() {
             <button
               onClick={() => setActiveTab("all")}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "all"
-                  ? theme === "dark" ? "bg-[#2563eb] text-white shadow-md shadow-blue-500/20" : "bg-[#4262ff] text-white shadow-md shadow-blue-500/20"
-                  : theme === "dark" ? "bg-[#1e293b] border border-[#334155] text-slate-300 hover:bg-[#334155]" : "bg-white border border-gray-200 text-slate-600 hover:bg-gray-50 hover:text-slate-900"
+                ? theme === "dark" ? "bg-[#2563eb] text-white shadow-md shadow-blue-500/20" : "bg-[#4262ff] text-white shadow-md shadow-blue-500/20"
+                : theme === "dark" ? "bg-[#1e293b] border border-[#334155] text-slate-300 hover:bg-[#334155]" : "bg-white border border-gray-200 text-slate-600 hover:bg-gray-50 hover:text-slate-900"
                 }`}
             >
               All Boards ({boards.length})
@@ -521,8 +558,8 @@ export default function Dashboard() {
             <button
               onClick={() => setActiveTab("my")}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "my"
-                  ? theme === "dark" ? "bg-[#2563eb] text-white shadow-md shadow-blue-500/20" : "bg-[#4262ff] text-white shadow-md shadow-blue-500/20"
-                  : theme === "dark" ? "bg-[#1e293b] border border-[#334155] text-slate-300 hover:bg-[#334155]" : "bg-white border border-gray-200 text-slate-600 hover:bg-gray-50 hover:text-slate-900"
+                ? theme === "dark" ? "bg-[#2563eb] text-white shadow-md shadow-blue-500/20" : "bg-[#4262ff] text-white shadow-md shadow-blue-500/20"
+                : theme === "dark" ? "bg-[#1e293b] border border-[#334155] text-slate-300 hover:bg-[#334155]" : "bg-white border border-gray-200 text-slate-600 hover:bg-gray-50 hover:text-slate-900"
                 }`}
             >
               👑 My Boards ({boards.filter(b => b.IsOwner).length})
@@ -530,8 +567,8 @@ export default function Dashboard() {
             <button
               onClick={() => setActiveTab("shared")}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "shared"
-                  ? theme === "dark" ? "bg-[#2563eb] text-white shadow-md shadow-blue-500/20" : "bg-[#4262ff] text-white shadow-md shadow-blue-500/20"
-                  : theme === "dark" ? "bg-[#1e293b] border border-[#334155] text-slate-300 hover:bg-[#334155]" : "bg-white border border-gray-200 text-slate-600 hover:bg-gray-50 hover:text-slate-900"
+                ? theme === "dark" ? "bg-[#2563eb] text-white shadow-md shadow-blue-500/20" : "bg-[#4262ff] text-white shadow-md shadow-blue-500/20"
+                : theme === "dark" ? "bg-[#1e293b] border border-[#334155] text-slate-300 hover:bg-[#334155]" : "bg-white border border-gray-200 text-slate-600 hover:bg-gray-50 hover:text-slate-900"
                 }`}
             >
               🤝 Shared with Me ({boards.filter(b => !b.IsOwner).length})
@@ -539,8 +576,8 @@ export default function Dashboard() {
             <button
               onClick={() => setActiveTab("starred")}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeTab === "starred"
-                  ? theme === "dark" ? "bg-[#2563eb] text-white shadow-md shadow-blue-500/20" : "bg-[#4262ff] text-white shadow-md shadow-blue-500/20"
-                  : theme === "dark" ? "bg-[#1e293b] border border-[#334155] text-slate-300 hover:bg-[#334155]" : "bg-white border border-gray-200 text-slate-600 hover:bg-gray-50 hover:text-slate-900"
+                ? theme === "dark" ? "bg-[#2563eb] text-white shadow-md shadow-blue-500/20" : "bg-[#4262ff] text-white shadow-md shadow-blue-500/20"
+                : theme === "dark" ? "bg-[#1e293b] border border-[#334155] text-slate-300 hover:bg-[#334155]" : "bg-white border border-gray-200 text-slate-600 hover:bg-gray-50 hover:text-slate-900"
                 }`}
             >
               <Star size={14} className={activeTab === "starred" ? "fill-current" : ""} />
@@ -560,8 +597,8 @@ export default function Dashboard() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`w-full rounded-xl pl-10 pr-4 py-2 text-xs focus:outline-none transition-colors ${theme === "dark"
-                    ? "bg-[#0f172a] border border-[#1e293b] text-slate-200 focus:border-[#2563eb] placeholder:text-slate-500"
-                    : "bg-white border border-gray-200 text-slate-800 focus:border-blue-500 placeholder:text-slate-400 shadow-xs"
+                  ? "bg-[#0f172a] border border-[#1e293b] text-slate-200 focus:border-[#2563eb] placeholder:text-slate-500"
+                  : "bg-white border border-gray-200 text-slate-800 focus:border-blue-500 placeholder:text-slate-400 shadow-xs"
                   }`}
               />
             </div>
@@ -572,8 +609,8 @@ export default function Dashboard() {
               <button
                 onClick={() => setViewMode("grid")}
                 className={`p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer ${viewMode === "grid"
-                    ? theme === "dark" ? "bg-[#1e293b] text-[#38bdf8] font-bold" : "bg-gray-100 text-[#4262ff] font-bold"
-                    : ""
+                  ? theme === "dark" ? "bg-[#1e293b] text-[#38bdf8] font-bold" : "bg-gray-100 text-[#4262ff] font-bold"
+                  : ""
                   }`}
                 title="Grid View"
               >
@@ -582,8 +619,8 @@ export default function Dashboard() {
               <button
                 onClick={() => setViewMode("list")}
                 className={`p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer ${viewMode === "list"
-                    ? theme === "dark" ? "bg-[#1e293b] text-[#38bdf8] font-bold" : "bg-gray-100 text-[#4262ff] font-bold"
-                    : ""
+                  ? theme === "dark" ? "bg-[#1e293b] text-[#38bdf8] font-bold" : "bg-gray-100 text-[#4262ff] font-bold"
+                  : ""
                   }`}
                 title="List View"
               >
@@ -631,14 +668,14 @@ export default function Dashboard() {
               return (
                 <Link key={board.ID} to={`/b/${board.ID}`} className="block group">
                   <div className={`h-56 rounded-2xl p-5 flex flex-col justify-between border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg relative overflow-hidden shadow-xs ${theme === "dark"
-                      ? "bg-[#1e293b] border-[#334155] group-hover:border-blue-500/50"
-                      : "bg-white border-gray-200 group-hover:border-blue-500/50"
+                    ? "bg-[#1e293b] border-[#334155] group-hover:border-blue-500/50"
+                    : "bg-white border-gray-200 group-hover:border-blue-500/50"
                     }`}>
 
                     {/* Top Card Thumbnail Header */}
                     <div className={`h-28 rounded-xl p-3 border relative flex items-center justify-center overflow-hidden ${theme === "dark"
-                        ? "bg-gradient-to-br from-slate-900 via-[#0f172a] to-blue-950/30 border-[#334155]"
-                        : "bg-gradient-to-br from-amber-100/70 via-slate-100 to-blue-50/50 border-gray-100"
+                      ? "bg-gradient-to-br from-slate-900 via-[#0f172a] to-blue-950/30 border-[#334155]"
+                      : "bg-gradient-to-br from-amber-100/70 via-slate-100 to-blue-50/50 border-gray-100"
                       }`}>
                       <div className={`w-full h-full rounded-lg shadow-xs border p-2 flex gap-1.5 opacity-90 group-hover:scale-105 transition-transform ${theme === "dark" ? "bg-[#0f172a]/90 border-[#334155]" : "bg-white/80 border-gray-200/60"
                         }`}>
@@ -688,8 +725,8 @@ export default function Dashboard() {
                           {board.Name || "Untitled Board"}
                         </h3>
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold flex-shrink-0 ${board.IsOwner
-                            ? theme === "dark" ? "bg-blue-500/20 text-blue-300 border border-blue-500/30" : "bg-blue-50 text-blue-700 border border-blue-200"
-                            : theme === "dark" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" : "bg-amber-50 text-amber-700 border border-amber-200"
+                          ? theme === "dark" ? "bg-blue-500/20 text-blue-300 border border-blue-500/30" : "bg-blue-50 text-blue-700 border border-blue-200"
+                          : theme === "dark" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" : "bg-amber-50 text-amber-700 border border-amber-200"
                           }`}>
                           {board.IsOwner ? "👑 My Board" : "🤝 Shared"}
                         </span>
@@ -752,8 +789,8 @@ export default function Dashboard() {
                     {/* Owner Column */}
                     <div className="col-span-2 flex items-center justify-center">
                       <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold ${board.IsOwner
-                          ? theme === "dark" ? "bg-blue-500/20 text-blue-300 border border-blue-500/30" : "bg-blue-50 text-blue-700 border border-blue-200"
-                          : theme === "dark" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" : "bg-amber-50 text-amber-700 border border-amber-200"
+                        ? theme === "dark" ? "bg-blue-500/20 text-blue-300 border border-blue-500/30" : "bg-blue-50 text-blue-700 border border-blue-200"
+                        : theme === "dark" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" : "bg-amber-50 text-amber-700 border border-amber-200"
                         }`}>
                         {board.IsOwner ? "👑 My Board" : "🤝 Shared"}
                       </span>
@@ -803,9 +840,8 @@ export default function Dashboard() {
           onClick={() => setRenameModalData(null)}
         >
           <div
-            className={`w-full max-w-md rounded-3xl border shadow-2xl p-6 flex flex-col gap-4 animate-in zoom-in-95 duration-150 ${
-              theme === "dark" ? "bg-[#1e293b] border-[#334155] text-slate-100" : "bg-white border-gray-200 text-slate-800"
-            }`}
+            className={`w-full max-w-md rounded-3xl border shadow-2xl p-6 flex flex-col gap-4 animate-in zoom-in-95 duration-150 ${theme === "dark" ? "bg-[#1e293b] border-[#334155] text-slate-100" : "bg-white border-gray-200 text-slate-800"
+              }`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -837,9 +873,8 @@ export default function Dashboard() {
                   if (e.key === "Enter") handleSaveRename();
                   if (e.key === "Escape") setRenameModalData(null);
                 }}
-                className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold transition-all ${
-                  theme === "dark" ? "bg-[#0f172a] border-[#334155] text-slate-100 placeholder:text-slate-600" : "bg-gray-50 border-gray-200 text-slate-900 placeholder:text-slate-400"
-                }`}
+                className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold transition-all ${theme === "dark" ? "bg-[#0f172a] border-[#334155] text-slate-100 placeholder:text-slate-600" : "bg-gray-50 border-gray-200 text-slate-900 placeholder:text-slate-400"
+                  }`}
                 placeholder="Board name..."
               />
             </div>
@@ -847,9 +882,8 @@ export default function Dashboard() {
             <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
               <button
                 onClick={() => setRenameModalData(null)}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  theme === "dark" ? "bg-slate-800 hover:bg-slate-700 text-slate-300" : "bg-gray-100 hover:bg-gray-200 text-slate-700"
-                }`}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${theme === "dark" ? "bg-slate-800 hover:bg-slate-700 text-slate-300" : "bg-gray-100 hover:bg-gray-200 text-slate-700"
+                  }`}
               >
                 Cancel
               </button>
@@ -872,9 +906,8 @@ export default function Dashboard() {
           onClick={() => setDeleteModalData(null)}
         >
           <div
-            className={`w-full max-w-md rounded-3xl border shadow-2xl p-6 flex flex-col gap-4 animate-in zoom-in-95 duration-150 ${
-              theme === "dark" ? "bg-[#1e293b] border-[#334155] text-slate-100" : "bg-white border-gray-200 text-slate-800"
-            }`}
+            className={`w-full max-w-md rounded-3xl border shadow-2xl p-6 flex flex-col gap-4 animate-in zoom-in-95 duration-150 ${theme === "dark" ? "bg-[#1e293b] border-[#334155] text-slate-100" : "bg-white border-gray-200 text-slate-800"
+              }`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -902,9 +935,8 @@ export default function Dashboard() {
             <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
               <button
                 onClick={() => setDeleteModalData(null)}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  theme === "dark" ? "bg-slate-800 hover:bg-slate-700 text-slate-300" : "bg-gray-100 hover:bg-gray-200 text-slate-700"
-                }`}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${theme === "dark" ? "bg-slate-800 hover:bg-slate-700 text-slate-300" : "bg-gray-100 hover:bg-gray-200 text-slate-700"
+                  }`}
               >
                 Cancel
               </button>

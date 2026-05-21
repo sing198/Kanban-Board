@@ -6,6 +6,7 @@ import (
 	"os"
 	"sort"
 
+	"github.com/glebarez/sqlite"
 	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -51,40 +52,55 @@ func minPositionGap(positions []float64) float64 {
 }
 
 func InitDB() *gorm.DB {
-	var dsn string
+	var db *gorm.DB
+	var err error
 
-	// 1. เช็คก่อนว่ามี DATABASE_URL ไหม ( Render / Heroku / Production จะส่งค่านี้มา)
-	if envURL := os.Getenv("DATABASE_URL"); envURL != "" {
-		dsn = envURL
-	} else {
-		// 2. ถ้าไม่มี DATABASE_URL ให้ใช้การอ่านแบบแยกตัวแปร หรือ Fallback เป็น Local
-		host := os.Getenv("DB_HOST")
-		if host == "" {
-			host = "localhost"
-		}
-		port := os.Getenv("DB_PORT")
-		if port == "" {
-			port = "5433"
-		}
-		user := os.Getenv("DB_USER")
-		if user == "" {
-			user = "admin"
-		}
-		password := os.Getenv("DB_PASSWORD")
-		if password == "" {
-			password = "password"
-		}
-		dbname := os.Getenv("DB_NAME")
-		if dbname == "" {
-			dbname = "kanban"
+	envURL := os.Getenv("DATABASE_URL")
+	host := os.Getenv("DB_HOST")
+
+	// Try PostgreSQL if DATABASE_URL or DB_HOST is explicitly configured
+	if envURL != "" || (host != "" && host != "localhost") {
+		dsn := envURL
+		if dsn == "" {
+			port := os.Getenv("DB_PORT")
+			if port == "" {
+				port = "5432"
+			}
+			user := os.Getenv("DB_USER")
+			if user == "" {
+				user = "admin"
+			}
+			password := os.Getenv("DB_PASSWORD")
+			if password == "" {
+				password = "password"
+			}
+			dbname := os.Getenv("DB_NAME")
+			if dbname == "" {
+				dbname = "kanban"
+			}
+			dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Bangkok", host, user, password, dbname, port)
 		}
 
-		dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Bangkok", host, user, password, dbname, port)
+		db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+		if err == nil {
+			log.Println("Successfully connected to PostgreSQL database")
+		} else {
+			log.Printf("PostgreSQL connection failed (%v). Falling back to embedded SQLite...", err)
+		}
 	}
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		log.Fatal("Failed to connect to database. Ensure Postgres is running. ", err)
+	// Fallback to embedded pure-Go SQLite if Postgres was not requested or failed
+	if db == nil {
+		_ = os.MkdirAll("data", 0755)
+		dbPath := "kanban.db"
+		if _, errDir := os.Stat("data"); errDir == nil {
+			dbPath = "data/kanban.db"
+		}
+		db, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+		if err != nil {
+			log.Fatalf("Failed to initialize SQLite database fallback: %v", err)
+		}
+		log.Printf("Successfully initialized SQLite database at %s", dbPath)
 	}
 
 	// AutoMigrate is idempotent and will NOT drop existing data.
