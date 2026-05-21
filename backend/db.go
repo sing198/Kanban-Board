@@ -51,28 +51,37 @@ func minPositionGap(positions []float64) float64 {
 }
 
 func InitDB() *gorm.DB {
-	host := os.Getenv("DB_HOST")
-	if host == "" {
-		host = "localhost" // default for local dev outside docker
-	}
-	port := os.Getenv("DB_PORT")
-	if port == "" {
-		port = "5433"
-	}
-	user := os.Getenv("DB_USER")
-	if user == "" {
-		user = "admin"
-	}
-	password := os.Getenv("DB_PASSWORD")
-	if password == "" {
-		password = "password"
-	}
-	dbname := os.Getenv("DB_NAME")
-	if dbname == "" {
-		dbname = "kanban"
+	var dsn string
+
+	// 1. เช็คก่อนว่ามี DATABASE_URL ไหม ( Render / Heroku / Production จะส่งค่านี้มา)
+	if envURL := os.Getenv("DATABASE_URL"); envURL != "" {
+		dsn = envURL
+	} else {
+		// 2. ถ้าไม่มี DATABASE_URL ให้ใช้การอ่านแบบแยกตัวแปร หรือ Fallback เป็น Local
+		host := os.Getenv("DB_HOST")
+		if host == "" {
+			host = "localhost"
+		}
+		port := os.Getenv("DB_PORT")
+		if port == "" {
+			port = "5433"
+		}
+		user := os.Getenv("DB_USER")
+		if user == "" {
+			user = "admin"
+		}
+		password := os.Getenv("DB_PASSWORD")
+		if password == "" {
+			password = "password"
+		}
+		dbname := os.Getenv("DB_NAME")
+		if dbname == "" {
+			dbname = "kanban"
+		}
+
+		dsn = fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Bangkok", host, user, password, dbname, port)
 	}
 
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Bangkok", host, user, password, dbname, port)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Failed to connect to database. Ensure Postgres is running. ", err)
