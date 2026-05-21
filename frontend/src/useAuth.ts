@@ -65,28 +65,6 @@ export function useAuth() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Derive the user from the stored token.
-  useEffect(() => {
-    if (!token) {
-      setUser(null);
-      return;
-    }
-    const payload = parseJwt(token);
-    const isExpired = payload && payload.exp && payload.exp * 1000 < Date.now();
-    if (payload && payload.sub && !isExpired) {
-      setUser({
-        id: payload.sub,
-        email: payload.email,
-        name: payload.name,
-        avatarUrl: payload.avatar,
-      });
-    } else {
-      localStorage.removeItem(TOKEN_KEY);
-      setToken(null);
-      setUser(null);
-    }
-  }, [token]);
-
   const login = useCallback(async (boardId: string) => {
     if (boardId === "guest") {
       try {
@@ -111,6 +89,35 @@ export function useAuth() {
     }
     window.location.href = `${API_URL}/auth/google/login?boardId=${boardId}`;
   }, []);
+
+  // Derive the user from the stored token.
+  useEffect(() => {
+    if (!token) {
+      setUser(null);
+      return;
+    }
+    if (token.endsWith(".mock_signature")) {
+      localStorage.removeItem(TOKEN_KEY);
+      setToken(null);
+      setUser(null);
+      login("guest");
+      return;
+    }
+    const payload = parseJwt(token);
+    const isExpired = payload && payload.exp && payload.exp * 1000 < Date.now();
+    if (payload && payload.sub && !isExpired) {
+      setUser({
+        id: payload.sub,
+        email: payload.email,
+        name: payload.name,
+        avatarUrl: payload.avatar,
+      });
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+      setToken(null);
+      setUser(null);
+    }
+  }, [token, login]);
 
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
