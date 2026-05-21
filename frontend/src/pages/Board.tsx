@@ -1299,12 +1299,12 @@ export default function Board() {
                 <div className={`absolute right-0 mt-2 w-72 rounded-2xl border shadow-xl p-4 z-50 animate-in fade-in slide-in-from-top-2 duration-150 ${theme === "dark" ? "bg-[#1e293b] border-[#334155] text-slate-100" : "bg-white border-gray-200 text-slate-800"
                   }`}>
                   <p className="text-xs leading-relaxed mb-3">
-                    {user
+                    {user && user.email !== "guest@kanban.demo"
                       ? "You're a viewer on this board. Ask for editor rights to make changes."
-                      : "You're a viewer on this board. To ask for editor rights to make changes, please log in."}
+                      : "You're a viewer on this board. To ask for editor rights to make changes, please log in with your Google account."}
                   </p>
 
-                  {user ? (
+                  {user && user.email !== "guest@kanban.demo" ? (
                     accessRequestStatus === "approved" ? (
                       <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5">
                         <Check size={14} /> Editor access granted!
@@ -1327,7 +1327,7 @@ export default function Board() {
                       onClick={() => handleLogin(boardId || "")}
                       className="w-full py-2 bg-[#4262ff] hover:bg-[#3551d8] text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-blue-500/20 cursor-pointer"
                     >
-                      Log in to Request
+                      Log in to Request Edit Access
                     </button>
                   )}
                 </div>
@@ -2459,7 +2459,7 @@ export default function Board() {
                 onClick={() => setShowGuestShareModal(false)}
                 className="w-full py-2 bg-transparent hover:bg-gray-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold rounded-xl transition-all cursor-pointer"
               >
-                Keep Editing as Guest
+                {isOwner || userRole === "editor" ? "Keep Editing as Guest" : "Keep Viewing as Guest"}
               </button>
             </div>
           </div>
