@@ -124,8 +124,10 @@ export function useAuth() {
 
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
     setToken(null);
     setUser(null);
+    window.location.href = "/";
   }, []);
 
   return { token, user, login, logout };
