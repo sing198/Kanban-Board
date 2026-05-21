@@ -225,7 +225,7 @@ export function useWebSocket(boardId: string, token: string | null) {
               Description: data.description !== undefined ? data.description : c.Description,
               DueDate: data.dueDate !== undefined ? data.dueDate : c.DueDate,
               Checklist: data.checklist !== undefined ? data.checklist : c.Checklist,
-              Tags: data.tags !== undefined ? data.tags : c.Tags
+              Tags: (data.tags !== undefined && data.tags !== "") ? data.tags : c.Tags
             } : c))
           );
         } else if (data.type === "UPDATE_BOARD_BACKGROUND" && data.background) {
@@ -347,16 +347,18 @@ export function useWebSocket(boardId: string, token: string | null) {
   }, [sendWsMsg]);
 
   const editCard = useCallback((cardId: string, title: string, tags?: string) => {
-    setCards((prev) => prev.map((c) => (c.ID.toString() === cardId ? { ...c, Title: title, Tags: tags ?? c.Tags } : c)));
-    sendWsMsg({ type: "EDIT_CARD", cardId, title, tags });
+    setCards((prev) => {
+      const targetCard = prev.find((c) => c.ID.toString() === cardId);
+      const currentTags = tags !== undefined ? tags : (targetCard?.Tags || "");
+      sendWsMsg({ type: "EDIT_CARD", cardId, title, tags: currentTags });
+      return prev.map((c) => (c.ID.toString() === cardId ? { ...c, Title: title, Tags: currentTags } : c));
+    });
   }, [sendWsMsg]);
 
   const updateCardTags = useCallback((cardId: string, tags: string) => {
-    setCards((prev) => prev.map((c) => (c.ID.toString() === cardId ? { ...c, Tags: tags } : c)));
     setCards((prev) => {
-      const targetCard = prev.find((c) => c.ID.toString() === cardId);
-      sendWsMsg({ type: "EDIT_CARD", cardId, title: targetCard?.Title || "", tags });
-      return prev;
+      sendWsMsg({ type: "UPDATE_CARD_TAGS", cardId, tags });
+      return prev.map((c) => (c.ID.toString() === cardId ? { ...c, Tags: tags } : c));
     });
   }, [sendWsMsg]);
 

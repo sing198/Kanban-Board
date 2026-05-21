@@ -309,7 +309,9 @@ func (c *Client) readPump() {
 				if msg.Swimlane != "" {
 					updates["swimlane"] = msg.Swimlane
 				}
-				updates["tags"] = msg.Tags
+				if msg.Tags != "" {
+					updates["tags"] = msg.Tags
+				}
 				updates["description"] = msg.Description
 				updates["due_date"] = msg.DueDate
 				updates["checklist"] = msg.Checklist
