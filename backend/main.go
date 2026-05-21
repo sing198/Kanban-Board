@@ -192,36 +192,27 @@ func main() {
 
 	r := gin.Default()
 
-	// Rate Limiting: 120 requests/minute per IP
-	ipLimiter := newIPRateLimiter(120, time.Minute)
-	r.Use(rateLimiterMiddleware(ipLimiter))
-
-	// CORS middleware for React frontend.
-	if raw := os.Getenv("CORS_ORIGINS"); raw != "" {
-		for _, o := range strings.Split(raw, ",") {
-			allowedOriginsMap[strings.TrimSpace(o)] = true
-		}
-	} else {
-		allowedOriginsMap["*"] = true
-	}
+	// 1. CORS middleware MUST BE FIRST so OPTIONS preflights always receive headers and 204.
 	r.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 		if origin != "" {
-			if allowedOriginsMap["*"] || allowedOriginsMap[origin] || len(allowedOriginsMap) == 0 {
-				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-				c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-			}
+			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		} else {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		}
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Origin, Accept")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
 		}
 		c.Next()
 	})
+
+	// 2. Rate Limiting Middleware (after CORS headers are attached)
+	ipLimiter := newIPRateLimiter(120, time.Minute)
+	r.Use(rateLimiterMiddleware(ipLimiter))
 
 	// Auth Routes
 	r.GET("/auth/google/login", GoogleLogin)
