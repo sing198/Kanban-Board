@@ -148,7 +148,8 @@ func (l *IPRateLimiter) allow(ip string) bool {
 
 func rateLimiterMiddleware(limiter *IPRateLimiter) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.Request.URL.Path == "/ws" {
+		p := c.Request.URL.Path
+		if p == "/ws" || p == "/api/notifications" || c.Request.Method == "OPTIONS" {
 			c.Next()
 			return
 		}
@@ -211,7 +212,7 @@ func main() {
 	})
 
 	// 2. Rate Limiting Middleware (after CORS headers are attached)
-	ipLimiter := newIPRateLimiter(120, time.Minute)
+	ipLimiter := newIPRateLimiter(300, time.Minute)
 	r.Use(rateLimiterMiddleware(ipLimiter))
 
 	// Auth Routes
