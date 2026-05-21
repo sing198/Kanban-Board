@@ -27,7 +27,7 @@ var upgrader = websocket.Upgrader{
 		if origin == "" {
 			return true
 		}
-		return isOriginAllowed(origin)
+		return allowedOriginsMap["*"] || isOriginAllowed(origin) || len(allowedOriginsMap) == 0
 	},
 }
 
