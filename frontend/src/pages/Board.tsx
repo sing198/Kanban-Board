@@ -964,7 +964,7 @@ export default function Board() {
 
   // Intercept Browser Back Button (<) and Tab Closing (X) for Guest Users
   useEffect(() => {
-    if (!user || user.email !== "guest@kanban.demo") return;
+    if (!user || user.email !== "guest@kanban.demo" || !isOwner) return;
 
     window.history.pushState(null, "", window.location.href);
 
@@ -1197,7 +1197,7 @@ export default function Board() {
         <div className="flex items-center gap-3">
           <div
             onClick={() => {
-              if (!user || user.email === "guest@kanban.demo") {
+              if ((!user || user.email === "guest@kanban.demo") && isOwner) {
                 setShowGuestExitModal(true);
               } else {
                 navigate("/");

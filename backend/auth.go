@@ -205,20 +205,16 @@ func GoogleCallback(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// If user logged in from a specific board (e.g., Guest board save), transfer ownership to the real user
+		// If user logged in from a specific board (e.g., Guest board save), transfer ownership ONLY if it belongs to Guest!
 		if boardID != "default" {
 			var targetBoard Board
 			if err := db.Where("id = ?", boardID).First(&targetBoard).Error; err == nil {
 				var guestUser User
-				isGuestBoard := false
 				if err := db.Where("email = ?", "guest@kanban.demo").First(&guestUser).Error; err == nil {
 					if targetBoard.OwnerID == guestUser.ID {
-						isGuestBoard = true
+						db.Model(&Board{}).Where("id = ?", boardID).Update("owner_id", user.ID)
+						log.Printf("🎉 Transferred Guest board %s ownership to User %s (%s)\n", boardID, user.Name, user.Email)
 					}
-				}
-				if isGuestBoard || targetBoard.OwnerID == 0 {
-					db.Model(&Board{}).Where("id = ?", boardID).Update("owner_id", user.ID)
-					log.Printf("🎉 Transferred board %s ownership from Guest to User %s (%s)\n", boardID, user.Name, user.Email)
 				}
 			}
 		}
