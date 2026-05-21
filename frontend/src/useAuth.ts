@@ -32,11 +32,25 @@ function parseJwt(token: string) {
 const TOKEN_KEY = "kanban_jwt";
 
 export function useAuth() {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
+  const [token, setToken] = useState<string | null>(() => {
+    const saved = localStorage.getItem(TOKEN_KEY);
+    if (saved) {
+      const payload = parseJwt(saved);
+      if (payload && (payload.email === "guest@kanban.demo" || payload.sub === "guest")) {
+        localStorage.removeItem(TOKEN_KEY);
+        return null;
+      }
+      return saved;
+    }
+    return null;
+  });
   const [user, setUser] = useState<User | null>(() => {
     const savedToken = localStorage.getItem(TOKEN_KEY);
     if (!savedToken) return null;
     const payload = parseJwt(savedToken);
+    if (payload && (payload.email === "guest@kanban.demo" || payload.sub === "guest")) {
+      return null;
+    }
     if (payload && payload.sub) {
       return {
         id: payload.sub,
