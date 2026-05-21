@@ -26,6 +26,7 @@ type UserPresence = {
   id: number;
   name: string;
   avatarUrl: string;
+  email?: string;
 };
 
 type Board = {
@@ -85,14 +86,27 @@ export default function Dashboard() {
       return <span className="text-[10px] text-slate-400 opacity-60">0 online</span>;
     }
 
+    // Filter out lingering Guest User presence if current user is logged in with a real Google account
+    const filteredUsers = users.filter((u) => {
+      if (!u) return false;
+      const isGuestPresence = u.name === "Guest" || u.name === "Guest User" || (u.email && u.email === "guest@kanban.demo") || u.name?.toLowerCase().includes("guest") || u.id === 0;
+      if (user && user.email !== "guest@kanban.demo" && isGuestPresence) {
+        return false;
+      }
+      return true;
+    });
+
+    if (filteredUsers.length === 0) {
+      return <span className="text-[10px] text-slate-400 opacity-60">0 online</span>;
+    }
+
     // Strict client-side deduplication by ID, Name, or Guest!
     const seen = new Set<string>();
     const uniqueUsers: UserPresence[] = [];
 
-    for (const u of users) {
+    for (const u of filteredUsers) {
       if (!u) continue;
-      // Key by id if present (>0), or by lowercased name if present (and != Guest), else "guest"
-      const isGuest = u.name === "Guest" || !u.name || u.id === 0;
+      const isGuest = u.name === "Guest" || u.name === "Guest User" || (u.email && u.email === "guest@kanban.demo") || u.name?.toLowerCase().includes("guest") || !u.name || u.id === 0;
       const key = (!isGuest && u.id && u.id > 0)
         ? `user-id:${u.id}`
         : (!isGuest && u.name)
@@ -107,8 +121,8 @@ export default function Dashboard() {
 
     // Deterministic sorting: Users with avatar image first, then initial badges, Guests last
     uniqueUsers.sort((a, b) => {
-      const aIsGuest = a.name === "Guest" || !a.name || a.id === 0;
-      const bIsGuest = b.name === "Guest" || !b.name || b.id === 0;
+      const aIsGuest = a.name === "Guest" || a.name === "Guest User" || (a.email && a.email === "guest@kanban.demo") || a.name?.toLowerCase().includes("guest") || !a.name || a.id === 0;
+      const bIsGuest = b.name === "Guest" || b.name === "Guest User" || (b.email && b.email === "guest@kanban.demo") || b.name?.toLowerCase().includes("guest") || !b.name || b.id === 0;
       if (aIsGuest !== bIsGuest) return aIsGuest ? 1 : -1;
 
       const aHasImg = !!a.avatarUrl;
