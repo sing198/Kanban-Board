@@ -2,6 +2,14 @@
 
 A real-time collaborative kanban board built with a Go backend and a React + TypeScript frontend. Cards, columns, and swimlanes sync instantly across everyone connected to a board over WebSockets, and Redis Pub/Sub is used so it can scale across multiple backend instances.
 
+## Preview
+
+### Dashboard
+![Kanban Dashboard](./screenshot/KanbanDashboard.png)
+
+### Kanban Board
+![Kanban Board](./screenshot/KanbanBoard.png)
+
 ## Features
 
 **Real-time sync**
