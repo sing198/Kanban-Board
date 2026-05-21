@@ -2078,18 +2078,6 @@ export default function Board() {
             {/* TAB 1: INVITE */}
             {shareTab === "invite" && (
               <>
-                {/* Top Email Input Box */}
-                <div className={`flex items-center gap-3 border rounded-xl p-3 ${theme === "dark" ? "bg-[#1e293b] border-[#334155]" : "bg-white border-gray-300"
-                  }`}>
-                  <UserPlus size={18} className="text-slate-400 flex-shrink-0" />
-                  <input
-                    type="text"
-                    placeholder="Enter emails or invite from Slack, Google or Microsoft"
-                    className={`w-full bg-transparent text-xs focus:outline-none placeholder:text-slate-400 ${theme === "dark" ? "text-slate-100" : "text-slate-800"
-                      }`}
-                  />
-                </div>
-
                 {/* Middle Invite Link Bar (Grey Container Box) */}
                 <div className={`flex items-center justify-between gap-2 border rounded-xl p-2 pl-3 ${theme === "dark" ? "bg-[#162032] border-[#334155]" : "bg-[#f4f5f7] border-gray-200"
                   }`}>
