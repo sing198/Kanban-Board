@@ -202,16 +202,20 @@ func main() {
 			allowedOriginsMap[strings.TrimSpace(o)] = true
 		}
 	} else {
-		allowedOriginsMap["http://localhost:5173"] = true
+		allowedOriginsMap["*"] = true
 	}
 	r.Use(func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		if origin != "" && allowedOriginsMap[origin] {
-			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		if origin != "" {
+			if allowedOriginsMap["*"] || allowedOriginsMap[origin] || len(allowedOriginsMap) == 0 {
+				c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+				c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+			}
+		} else {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		}
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return

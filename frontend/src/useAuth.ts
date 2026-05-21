@@ -88,6 +88,22 @@ export function useAuth() {
   }, [token]);
 
   const login = useCallback((boardId: string) => {
+    if (boardId === "guest") {
+      const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+      const exp = Math.floor(Date.now() / 1000) + 7 * 24 * 3600;
+      const guestId = Math.floor(Math.random() * 899999) + 100000;
+      const payload = btoa(JSON.stringify({
+        sub: guestId,
+        email: "guest@kanban.demo",
+        name: "Guest User",
+        avatar: "",
+        exp: exp
+      }));
+      const mockJwt = `${header}.${payload}.mock_signature`;
+      localStorage.setItem(TOKEN_KEY, mockJwt);
+      setToken(mockJwt);
+      return;
+    }
     window.location.href = `${API_URL}/auth/google/login?boardId=${boardId}`;
   }, []);
 
