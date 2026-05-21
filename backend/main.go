@@ -274,14 +274,16 @@ func main() {
 						uID := uint(floatID)
 						userRole = resolveBoardRole(db, id, board.OwnerID, uID)
 
-						// Optional history record for authenticated visitor (only if not owner)
-						if board.OwnerID != uID {
+						// Optional history record for authenticated visitor (only if not owner AND not guest@kanban.demo)
+						var guestUser User
+						isGuestVisitor := false
+						if err := db.Where("email = ?", "guest@kanban.demo").First(&guestUser).Error; err == nil && guestUser.ID == uID {
+							isGuestVisitor = true
+						}
+
+						if !isGuestVisitor && board.OwnerID != uID {
 							var member BoardMember
 							if err := db.Where("board_id = ? AND user_id = ?", id, uID).First(&member).Error; err != nil {
-								// Only auto-track users who actually have a real role on
-								// the board; previously any logged-in viewer got a
-								// "shared" BoardMember row created, polluting the
-								// member list and leaking their presence to the owner.
 								if userRole == "edit" || userRole == "view" {
 									db.Create(&BoardMember{BoardID: id, UserID: uID, Role: userRole, LastSeen: time.Now()})
 								}
@@ -380,6 +382,12 @@ func main() {
 
 		var memberBoardIDs []string
 		db.Model(&BoardMember{}).Where("user_id = ? AND role != 'owner'", userID).Pluck("board_id", &memberBoardIDs)
+
+		// Never leak/attach shared boards of other users to guest@kanban.demo demo account
+		var guestUser User
+		if err := db.Where("email = ?", "guest@kanban.demo").First(&guestUser).Error; err == nil && guestUser.ID == userID {
+			memberBoardIDs = nil
+		}
 
 		var boards []Board
 		if len(memberBoardIDs) > 0 {
