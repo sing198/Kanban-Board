@@ -528,7 +528,10 @@ export default function Dashboard() {
           </div>
 
           <button
-            onClick={logout}
+            onClick={() => {
+              logout();
+              navigate("/");
+            }}
             className={`p-2 rounded-xl border transition-colors ${theme === "dark"
               ? "bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-transparent"
               : "bg-gray-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border-gray-200"

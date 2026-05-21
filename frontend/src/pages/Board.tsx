@@ -1462,8 +1462,11 @@ export default function Board() {
               />
               <span className={`text-xs font-semibold ${theme === "dark" ? "text-slate-200" : "text-slate-700"}`}>{user.name}</span>
               <button
-                onClick={logout}
-                className="text-slate-400 hover:text-rose-600 transition-colors ml-1"
+                onClick={() => {
+                  logout();
+                  navigate("/");
+                }}
+                className="text-slate-400 hover:text-rose-600 transition-colors ml-1 cursor-pointer"
                 title="Logout"
               >
                 <LogOut size={13} />
