@@ -83,17 +83,17 @@ export function useWebSocket(boardId: string, token: string | null) {
           const swimList = data.Swimlanes ? data.Swimlanes.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
           setSwimlanes(swimList);
         }
-      }
 
-      // 2. ดึง Invite Tokens (เฉพาะเมื่อมี Token การเข้าสู่ระบบ)
-      if (token) {
-        const tokensRes = await fetch(`${API_URL}/api/boards/${boardId}/invite-tokens`, {
-          headers,
-        });
-        if (tokensRes.ok) {
-          const tData = await tokensRes.json();
-          setEditInviteToken(tData.editToken || "");
-          setViewInviteToken(tData.viewToken || "");
+        // 2. ดึง Invite Tokens (เฉพาะเมื่อเป็นเจ้าของบอร์ดเท่านั้น)
+        if (token && (data.IsOwner || data.UserRole === "owner")) {
+          const tokensRes = await fetch(`${API_URL}/api/boards/${boardId}/invite-tokens`, {
+            headers,
+          });
+          if (tokensRes.ok) {
+            const tData = await tokensRes.json();
+            setEditInviteToken(tData.editToken || "");
+            setViewInviteToken(tData.viewToken || "");
+          }
         }
       }
     } catch (err) {
