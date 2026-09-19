@@ -58,8 +58,8 @@ func InitDB() *gorm.DB {
 	envURL := os.Getenv("DATABASE_URL")
 	host := os.Getenv("DB_HOST")
 
-	// Try PostgreSQL if DATABASE_URL or DB_HOST is explicitly configured
-	if envURL != "" || (host != "" && host != "localhost") {
+	// Explicit PostgreSQL configuration must never silently select another database.
+	if envURL != "" || host != "" {
 		dsn := envURL
 		if dsn == "" {
 			port := os.Getenv("DB_PORT")
@@ -85,11 +85,11 @@ func InitDB() *gorm.DB {
 		if err == nil {
 			log.Println("Successfully connected to PostgreSQL database")
 		} else {
-			log.Printf("PostgreSQL connection failed (%v). Falling back to embedded SQLite...", err)
+			log.Fatalf("PostgreSQL connection failed: %v. Check DATABASE_URL / DB_HOST and database availability. SQLite fallback is disabled when PostgreSQL is configured.", err)
 		}
 	}
 
-	// Fallback to embedded pure-Go SQLite if Postgres was not requested or failed
+	// Use embedded pure-Go SQLite only when PostgreSQL was not configured.
 	if db == nil {
 		_ = os.MkdirAll("data", 0755)
 		dbPath := "kanban.db"
@@ -98,7 +98,7 @@ func InitDB() *gorm.DB {
 		}
 		db, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 		if err != nil {
-			log.Fatalf("Failed to initialize SQLite database fallback: %v", err)
+			log.Fatalf("Failed to initialize SQLite database: %v", err)
 		}
 		log.Printf("Successfully initialized SQLite database at %s", dbPath)
 	}

@@ -48,7 +48,7 @@ export function useAuth() {
     const sessionSaved = sessionStorage.getItem(TOKEN_KEY);
     if (sessionSaved) {
       const payload = parseJwt(sessionSaved);
-      if (payload && !payload.exp || (payload.exp * 1000 > Date.now())) {
+      if (payload && (!payload.exp || payload.exp * 1000 > Date.now())) {
         return sessionSaved;
       } else {
         sessionStorage.removeItem(TOKEN_KEY);
@@ -109,11 +109,12 @@ export function useAuth() {
               avatarUrl: data.user.avatarUrl,
             });
           }
-          return;
+          return data.token as string;
         }
       } catch (e) {
         console.error("Backend guest login failed", e);
       }
+      throw new Error("Could not start a guest session. Please try again.");
     }
     window.location.href = `${API_URL}/auth/google/login?boardId=${boardId}`;
   }, []);

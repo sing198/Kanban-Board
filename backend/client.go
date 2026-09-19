@@ -45,28 +45,28 @@ type Client struct {
 }
 
 type WsMessage struct {
-	Type        string   `json:"type"`
-	CardId      string   `json:"cardId,omitempty"`
-	BoardId     string   `json:"boardId,omitempty"`
-	Title       string   `json:"title,omitempty"`
-	ToList      string   `json:"toList,omitempty"`
-	Swimlane    string   `json:"swimlane,omitempty"`
-	Position    float64  `json:"position,omitempty"`
-	Card        *Card    `json:"card,omitempty"`
-	Cards       []Card   `json:"cards,omitempty"`
-	ColumnName  string   `json:"columnName,omitempty"`
-	OldColumn   string   `json:"oldColumn,omitempty"`
-	Columns     string   `json:"columns,omitempty"`
-	Swimlanes   string   `json:"swimlanes,omitempty"`
-	OldSwimlane string   `json:"oldSwimlane,omitempty"`
-	BoardName   string   `json:"boardName,omitempty"`
-	AccessLevel string   `json:"accessLevel,omitempty"`
-	InviteToken string   `json:"inviteToken,omitempty"`
-	Tags        string   `json:"tags,omitempty"`
-	Description string   `json:"description,omitempty"`
-	DueDate     string   `json:"dueDate,omitempty"`
-	Checklist   string   `json:"checklist,omitempty"`
-	Background  string   `json:"background,omitempty"`
+	Type        string  `json:"type"`
+	CardId      string  `json:"cardId,omitempty"`
+	BoardId     string  `json:"boardId,omitempty"`
+	Title       string  `json:"title,omitempty"`
+	ToList      string  `json:"toList,omitempty"`
+	Swimlane    string  `json:"swimlane,omitempty"`
+	Position    float64 `json:"position,omitempty"`
+	Card        *Card   `json:"card,omitempty"`
+	Cards       []Card  `json:"cards,omitempty"`
+	ColumnName  string  `json:"columnName,omitempty"`
+	OldColumn   string  `json:"oldColumn,omitempty"`
+	Columns     string  `json:"columns,omitempty"`
+	Swimlanes   string  `json:"swimlanes,omitempty"`
+	OldSwimlane string  `json:"oldSwimlane,omitempty"`
+	BoardName   string  `json:"boardName,omitempty"`
+	AccessLevel string  `json:"accessLevel,omitempty"`
+	InviteToken string  `json:"inviteToken,omitempty"`
+	Tags        string  `json:"tags,omitempty"`
+	Description string  `json:"description,omitempty"`
+	DueDate     string  `json:"dueDate,omitempty"`
+	Checklist   string  `json:"checklist,omitempty"`
+	Background  string  `json:"background,omitempty"`
 }
 
 // sendError is a small helper that pushes an ERROR frame back to this client.
@@ -282,7 +282,11 @@ func (c *Client) readPump() {
 				if msg.Swimlane != "" {
 					updates["swimlane"] = msg.Swimlane
 				}
-				c.db.Model(&Card{}).Where("id = ? AND board_id = ?", msg.CardId, c.boardID).Updates(updates)
+				result := c.db.Model(&Card{}).Where("id = ? AND board_id = ?", msg.CardId, c.boardID).Updates(updates)
+				if result.Error != nil || result.RowsAffected == 0 {
+					c.sendError("Could not move card. Refreshing board.")
+					continue
+				}
 				if needs, err := c.needsRenormalize(msg.ToList); err != nil {
 					log.Println("renormalize check failed:", err)
 				} else if needs {

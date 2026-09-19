@@ -18,7 +18,7 @@ import {
   arrayMove
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, Link as LinkIcon, Edit2, Trash2, LogOut, AlertCircle, Wifi, WifiOff, X, ChevronDown, ChevronRight, Sun, Moon, UserPlus, Globe, Code, Eye, Bell, Check, ArrowLeft, Download, Search, Tag, FileText, Image, Calendar, Clock, CheckSquare, Palette } from "lucide-react";
+import { Plus, Link as LinkIcon, Edit2, Trash2, LogOut, AlertCircle, Wifi, WifiOff, X, ChevronDown, ChevronRight, Sun, Moon, UserPlus, Globe, Code, Eye, Bell, Check, ArrowLeft, Download, Search, Tag, FileText, Image, Calendar, Clock, CheckSquare, Palette, LayoutDashboard, Layers3, ArrowUpRight, Sparkles } from "lucide-react";
 import { toPng } from "html-to-image";
 
 import { useWebSocket } from "../useWebSocket";
@@ -286,12 +286,14 @@ function DraggableCard({
           onOpenDetail(cardData);
         }
       }}
-      className={`bg-white dark:bg-[#1e293b] border ${colStyle.cardBorder} p-4 rounded-2xl ${isTagPopoverOpen ? "cursor-default" : "cursor-pointer"} group transition-all duration-150 w-full max-w-full flex flex-col gap-2.5 shadow-xs hover:shadow-md relative`}
+      className={`board-task-card bg-white dark:bg-[#1e293b] border ${colStyle.cardBorder} p-4 rounded-2xl ${isTagPopoverOpen ? "cursor-default" : "cursor-pointer"} group transition-all duration-150 w-full max-w-full flex flex-col gap-2.5 shadow-xs hover:shadow-md relative`}
     >
+      <div className="task-eyebrow"><span>TSK-{String(id).padStart(3, "0")}</span><span className="task-status-dot" style={{ background: ["#a7a9b8", "#9681ed", "#67b09e"][columnIndex % 3] }} /></div>
       <p className={`text-sm font-semibold text-slate-800 dark:text-slate-100 w-full min-w-0 [overflow-wrap:anywhere] [word-break:break-word] whitespace-pre-wrap leading-relaxed ${canEdit ? "pr-6" : ""}`}>
         {title}
       </p>
 
+      {cardData.Description && <p className="task-description">{cardData.Description}</p>}
       {canEdit && (
         <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm p-1 rounded-lg border border-gray-200 dark:border-slate-700 shadow-xs z-10">
           <button
@@ -898,7 +900,6 @@ export default function Board() {
 
   const allBoardTags = React.useMemo(() => {
     const tagSet = new Set<string>();
-    TAG_PRESETS.forEach(p => tagSet.add(p.name));
     cards.forEach(c => {
       if (c.Tags) {
         c.Tags.split(",").forEach(t => {
@@ -1018,25 +1019,12 @@ export default function Board() {
       return e.returnValue;
     };
 
-    const handleUnload = () => {
-      if (isLoggingInRef.current) return;
-      const token = (sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"));
-      if (boardId && token) {
-        fetch(`${API_URL}/api/boards/${boardId}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-          keepalive: true,
-        });
-      }
-    };
-
+    // Reloading a guest board must preserve it. Explicit exit/logout handles deletion.
     window.addEventListener("popstate", handlePopState);
     window.addEventListener("beforeunload", handleBeforeUnload);
-    window.addEventListener("unload", handleUnload);
     return () => {
       window.removeEventListener("popstate", handlePopState);
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.removeEventListener("unload", handleUnload);
     };
   }, [user, isOwner, boardId]);
 
@@ -1193,25 +1181,46 @@ export default function Board() {
   const bgPresetClass = BOARD_BACKGROUND_PRESETS[boardBackground]?.class || "";
 
   return (
-    <div className={`min-h-screen font-sans relative selection:bg-blue-500/20 transition-all duration-300 ${
+    <div className={`board-workspace min-h-screen font-sans relative selection:bg-blue-500/20 transition-all duration-300 ${
       bgPresetClass || (theme === "dark" ? "bg-[#090d16] text-[#f8fafc]" : "bg-[#f8fafc] text-slate-900")
     }`}>
 
+      <aside className="workspace-sidebar" aria-label="Workspace navigation">
+        <button className="workspace-logo" onClick={() => document.getElementById("board-overview")?.scrollIntoView({ block: "start" })}><span><Layers3 size={23} /></span>kanban<span className="workspace-logo-dot">.</span></button>
+        <div className="workspace-switcher"><span className="workspace-avatar">{user?.name?.[0] || "K"}</span><div><strong>My workspace</strong><small>{user?.email === "guest@kanban.demo" ? "Guest session" : "Personal workspace"}</small></div></div>
+        <div className="sidebar-section-label">WORKSPACE</div>
+        <button className="sidebar-nav" onClick={() => { if ((!user || user.email === "guest@kanban.demo") && isOwner) setShowGuestExitModal(true); else navigate("/"); }}><LayoutDashboard size={17} /> All boards <ArrowUpRight size={14} /></button>
+        <button className="sidebar-nav active" onClick={() => document.getElementById("board-content")?.scrollIntoView({ block: "start" })} aria-current="page"><Layers3 size={17} /> Current board <span>{cards.length}</span></button>
+        <div className="sidebar-section-label">WORKSTREAMS</div>
+        {(swimlanes.length ? swimlanes : ["All tasks"]).map((name, index) => (
+          <button key={name} onClick={() => document.getElementById(`workstream-${index}`)?.scrollIntoView({ block: "start" })} className="sidebar-stream"><i style={{ background: ["#8b7cf8", "#efa86c", "#5eb8a4"][index % 3] }} />{name}</button>
+        ))}
+        <div className="sidebar-bottom">
+          <div className="workspace-note"><Sparkles size={18} /><strong>Better work, together.</strong><p>Open this board in another tab to see updates as they happen.</p></div>
+          <div className="sidebar-profile"><span className="workspace-avatar">{user?.name?.[0] || "V"}</span><div><strong>{user?.name || "Visitor"}</strong><small>{isOwner ? "Workspace owner" : canEdit ? "Editor" : "Viewer"}</small></div></div>
+        </div>
+      </aside>
+      {status !== "connected" && (
+        <div role="status" className="bg-amber-100 text-amber-950 px-4 py-3 text-center text-sm">
+          {status === "connecting" ? "Connecting and refreshing your board…" : "Connection lost. Reconnecting…"}
+          {" "}Editing is paused. Recent changes may not be saved; check them after reconnecting.
+        </div>
+      )}
       {/* Toast Alert Banner */}
       {errorToast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 bg-rose-600/90 backdrop-blur-md text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-2 border border-rose-500/50 animate-bounce">
+        <div role="alert" className="bg-rose-50 text-rose-900 px-4 py-3 flex items-center justify-center gap-2 border-b border-rose-200">
           <AlertCircle size={18} />
           <span className="text-sm font-semibold">{errorToast}</span>
         </div>
       )}
 
       {/* Sleek Top Navigation Header */}
-      <header className={`px-6 py-3.5 border-b flex items-center justify-between backdrop-blur-md sticky top-0 z-40 transition-colors ${theme === "dark" ? "bg-[#0f172a]/95 border-[#1e293b]" : "bg-white border-gray-200 shadow-xs"
+      <header className={`board-topbar px-6 py-3.5 border-b flex items-center justify-between backdrop-blur-md sticky top-0 z-40 transition-colors ${theme === "dark" ? "bg-[#0f172a]/95 border-[#1e293b]" : "bg-white border-gray-200 shadow-xs"
         }`}>
 
         {/* Header Left: Brand Logo & Board Title */}
-        <div className="flex items-center gap-3">
-          <div
+        <div className="board-brand flex items-center gap-3">
+          <button
             onClick={() => {
               if ((!user || user.email === "guest@kanban.demo") && isOwner) {
                 setShowGuestExitModal(true);
@@ -1220,6 +1229,7 @@ export default function Board() {
               }
             }}
             className="flex items-center gap-2 group cursor-pointer select-none"
+            aria-label="Go to dashboard"
             title="Go to Dashboard"
           >
             {/* Sleek Gradient Glowing Logo Badge */}
@@ -1233,7 +1243,7 @@ export default function Board() {
             <span className="font-extrabold text-sm tracking-tight text-slate-800 dark:text-slate-100 group-hover:text-blue-500 transition-colors">
               Kanban
             </span>
-          </div>
+          </button>
 
           <div className={`h-4 w-px ${theme === "dark" ? "bg-[#1e293b]" : "bg-gray-200"}`} />
 
@@ -1268,7 +1278,7 @@ export default function Board() {
                   setIsEditingBoardName(true);
                 }
               }}
-              className={`text-sm font-extrabold transition-colors flex items-center gap-2 ${theme === "dark" ? "text-slate-100" : "text-slate-900"
+              className={`board-title text-sm font-extrabold transition-colors flex items-center gap-2 ${theme === "dark" ? "text-slate-100" : "text-slate-900"
                 } ${isOwner ? "hover:text-[#4262ff] dark:hover:text-[#38bdf8] cursor-pointer" : ""}`}
             >
               {boardName}
@@ -1278,7 +1288,7 @@ export default function Board() {
         </div>
 
         {/* Header Right Status & User */}
-        <div className="flex items-center gap-3">
+        <div className="board-top-actions flex items-center gap-3">
           <button
             onClick={toggleTheme}
             className={`p-1.5 rounded-xl border transition-colors cursor-pointer ${theme === "dark"
@@ -1510,19 +1520,39 @@ export default function Board() {
         </div>
       </header>
 
+      <section id="board-overview" className="board-overview" aria-label="Board overview">
+        <div className="overview-copy">
+          <div className="board-eyebrow"><span /> YOUR SPACE TO MAKE THINGS HAPPEN</div>
+          <h2>{boardName}</h2>
+          <p>Big ideas, small steps. Keep everything moving in one place.</p>
+          <div className="overview-meta"><span><Layers3 size={14} /> {columns.length} stages</span><span><UserPlus size={14} /> {swimlanes.length || 1} workstreams</span><span className="overview-access">{isOwner ? "Owner" : canEdit ? "Editor" : "View only"}</span></div>
+        </div>
+        <div className="overview-action">
+          {canEdit && columns.length > 0 && <button className="new-task-button" disabled={status !== "connected"} onClick={() => {
+            setSearchQuery(""); setSelectedTagFilter("All");
+            const swim = swimlanes[0] || "Untitled";
+            setCollapsedSwimlanes(prev => ({ ...prev, [swim]: false }));
+            setAddingToKey(`${columns[0]}:::${swim}`); setNewTaskTitle("");
+          }}><Plus size={17} /> New task</button>}
+          <div className="overview-task-count"><strong>{cards.length}</strong><span>tasks on this board</span></div>
+        </div>
+      </section>
+      <div className="board-view-tabs"><span><LayoutDashboard size={15} /> Board <span>{cards.length}</span></span><p>One shared view. Every next step.</p></div>
+
       {/* Secondary Toolbar: Search, Filter Chips & Export PNG/PDF */}
-      <div className={`px-6 py-2.5 border-b flex flex-wrap items-center justify-between gap-3 ${
+      <div className={`board-toolbar px-6 py-2.5 border-b flex flex-wrap items-center justify-between gap-3 ${
         theme === "dark" ? "bg-[#0b1329]/80 border-[#1e293b]" : "bg-slate-50 border-gray-200"
       }`}>
         {/* Left: Search input & Tag filters */}
-        <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
-          <div className={`flex items-center gap-2 border rounded-xl px-3 py-1.5 min-w-[200px] md:min-w-[260px] ${
+        <div className="board-filter-group flex items-center gap-2 flex-wrap min-w-0 flex-1">
+          <div className={`board-search flex items-center gap-2 border rounded-xl px-3 py-1.5 min-w-[200px] md:min-w-[260px] ${
             theme === "dark" ? "bg-[#1e293b] border-[#334155]" : "bg-white border-gray-200 shadow-2xs"
           }`}>
             <Search size={14} className="text-slate-400 flex-shrink-0" />
             <input
               type="text"
-              placeholder="Search cards in board..."
+              aria-label="Search cards"
+              placeholder="Search tasks…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={`w-full bg-transparent text-xs focus:outline-none placeholder:text-slate-400 ${
@@ -1530,14 +1560,15 @@ export default function Board() {
               }`}
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+              <button aria-label="Clear search" onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                 <X size={13} />
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto py-0.5 max-w-full">
+          <div className="board-filter-chips flex items-center gap-1.5 overflow-x-auto py-0.5 max-w-full">
             <button
+              aria-pressed={selectedTagFilter === "All"}
               onClick={() => setSelectedTagFilter("All")}
               className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
                 selectedTagFilter === "All"
@@ -1553,6 +1584,7 @@ export default function Board() {
               return (
                 <button
                   key={tagName}
+                  aria-pressed={active}
                   onClick={() => setSelectedTagFilter(active ? "All" : tagName)}
                   className={`px-2.5 py-1 rounded-xl text-xs font-extrabold border transition-all cursor-pointer ${colorObj?.bg || ''} ${colorObj?.text || ''} ${
                     active ? "ring-2 ring-blue-500 shadow-2xs" : (colorObj?.border || '') + " opacity-80 hover:opacity-100"
@@ -1660,7 +1692,17 @@ export default function Board() {
     </div>
 
       {/* MIRO KANBAN CANVAS */}
-      <main ref={boardContainerRef} className="p-6 md:p-8 w-full max-w-[1920px] mx-auto relative z-10 flex flex-col gap-6">
+      <div className="board-results" aria-live="polite">
+        <span><strong>Board view</strong> · {filteredCards.length} of {cards.length} tasks</span>
+        {(searchQuery || selectedTagFilter !== "All") ? (
+          <button onClick={() => { setSearchQuery(""); setSelectedTagFilter("All"); }}>Clear filters ×</button>
+        ) : <span>Drag to move · Click to open</span>}
+      </div>
+      {filteredCards.length === 0 && cards.length > 0 && (
+        <div className="board-no-results" role="status">No matching tasks. Try another search or clear your filters.</div>
+      )}
+      <div className="board-scroll" role="region" aria-label="Task board, scroll horizontally to see more stages" tabIndex={0}>
+      <main id="board-content" ref={boardContainerRef} className="board-canvas p-6 md:p-8 w-full max-w-[1920px] mx-auto relative z-10 flex flex-col gap-6" style={{ minWidth: Math.max(columns.length * 290 + 64, 354) }}>
 
         {/* Unauthenticated Edit Prompt Banner (Shown ONLY if logging in will grant edit access) */}
         {!user && canEditIfLoggedIn && (
@@ -1706,7 +1748,7 @@ export default function Board() {
               const colStyle = COLUMN_STYLES[colIdx % COLUMN_STYLES.length];
 
               return (
-                <div key={col} className="flex-1 min-w-0 flex items-center justify-between group">
+                <div key={col} className="board-column-heading flex-1 min-w-0 flex items-center justify-between group">
                   <div className="flex items-center gap-3">
                     <span className={`px-3 py-1 rounded-xl text-xs font-bold ${colStyle.headerPill}`}>
                       {col}
@@ -1752,11 +1794,11 @@ export default function Board() {
               }).length;
 
               return (
-                <div key={swim || "default"} className="flex flex-col gap-3 w-full">
+                <div id={`workstream-${swimIdx}`} key={swim || "default"} className="board-workstream flex flex-col gap-3 w-full">
 
                   {/* Swimlane Section Title Row with Collapsible Chevron */}
                   {swimlanes.length > 0 && (
-                    <div className="flex items-center gap-2.5 py-1 group/swim">
+                    <div className="workstream-heading flex items-center gap-2.5 py-1 group/swim">
                       <button 
                         className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors p-0.5 cursor-pointer"
                         onClick={() => toggleSwimlane(swim)}
@@ -1820,7 +1862,7 @@ export default function Board() {
                         const isAdding = addingToKey === dropKey;
 
                         return (
-                          <div key={col} className="flex-1 min-w-0 flex flex-col justify-between min-h-[100px] group/col">
+                          <div key={col} className="board-column flex-1 min-w-0 flex flex-col justify-between min-h-[100px] group/col">
                             <div className="flex flex-col">
                               <SortableContext items={swimCardIds} strategy={verticalListSortingStrategy}>
                                 <SwimlaneDropZone id={dropKey}>
@@ -1852,7 +1894,7 @@ export default function Board() {
                                   setAddingToKey(dropKey);
                                   setNewTaskTitle("");
                                 }}
-                                className={`mt-3 w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer opacity-0 group-hover/col:opacity-100 ${
+                                className={`mt-3 w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer opacity-100 ${
                                   theme === "dark"
                                     ? "bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/60"
                                     : "bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200/80 shadow-2xs"
@@ -1931,10 +1973,11 @@ export default function Board() {
           </div>
         </DndContext>
       </main>
+      </div>
 
       {/* Miro Floating Toolbar at Bottom Center */}
       {canEdit && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-40 backdrop-blur-xl px-3 py-1.5 rounded-2xl border shadow-xl flex items-center gap-1.5 ${theme === "dark" ? "bg-[#0f172a]/95 border-[#1e293b] text-slate-200" : "bg-white/95 border-gray-200 text-slate-700"
+        <div className={`board-create-toolbar fixed bottom-6 left-1/2 -translate-x-1/2 z-40 backdrop-blur-xl px-3 py-1.5 rounded-2xl border shadow-xl flex items-center gap-1.5 ${theme === "dark" ? "bg-[#0f172a]/95 border-[#1e293b] text-slate-200" : "bg-white/95 border-gray-200 text-slate-700"
           }`}>
           <button
             onClick={() => {
@@ -1953,6 +1996,7 @@ export default function Board() {
             }}
             className={`p-2 rounded-xl transition-all flex items-center gap-2 font-semibold text-xs group cursor-pointer ${theme === "dark" ? "hover:bg-[#1e293b] text-slate-300 hover:text-white" : "hover:bg-gray-100 text-slate-600 hover:text-slate-900"
               }`}
+            disabled={status !== "connected"}
             title="Add Swimlane (Horizontal Row)"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:scale-110 transition-transform">
@@ -1960,6 +2004,7 @@ export default function Board() {
               <line x1="12" y1="12" x2="12" y2="20" />
               <line x1="8" y1="16" x2="16" y2="16" />
             </svg>
+            <span>Add workstream</span>
           </button>
 
           <div className={`h-5 w-[1px] ${theme === "dark" ? "bg-[#1e293b]" : "bg-gray-200"}`} />
@@ -1975,6 +2020,7 @@ export default function Board() {
             }}
             className={`p-2 rounded-xl transition-all flex items-center gap-2 font-semibold text-xs group cursor-pointer ${theme === "dark" ? "hover:bg-[#1e293b] text-slate-300 hover:text-white" : "hover:bg-gray-100 text-slate-600 hover:text-slate-900"
               }`}
+            disabled={status !== "connected"}
             title="Add Column (Vertical Column)"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:scale-110 transition-transform">
@@ -1982,6 +2028,7 @@ export default function Board() {
               <line x1="12" y1="12" x2="20" y2="12" />
               <line x1="16" y1="8" x2="16" y2="16" />
             </svg>
+            <span>Add stage</span>
           </button>
         </div>
       )}

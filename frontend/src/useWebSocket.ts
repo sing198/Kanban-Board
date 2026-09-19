@@ -50,11 +50,15 @@ export function useWebSocket(boardId: string, token: string | null) {
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
   const ws = useRef<WebSocket | null>(null);
+  const readyToEdit = useRef(false);
+  const connectionGeneration = useRef(0);
   const activeSocketsRef = useRef<Set<WebSocket>>(new Set());
   const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectDelay = useRef<number>(1000);
 
   const closeAllSockets = useCallback(() => {
+    readyToEdit.current = false;
+    connectionGeneration.current += 1;
     activeSocketsRef.current.forEach((s) => {
       s.onclose = null;
       s.onerror = null;
@@ -68,6 +72,7 @@ export function useWebSocket(boardId: string, token: string | null) {
   }, []);
 
   const fetchBoard = useCallback(async () => {
+    const generation = connectionGeneration.current;
     try {
       const jwtToken = sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt");
       const headers: Record<string, string> = jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {};
@@ -76,8 +81,10 @@ export function useWebSocket(boardId: string, token: string | null) {
       const res = await fetch(`${API_URL}/api/boards/${boardId}`, {
         headers,
       });
+      if (!res.ok) throw new Error("Unable to refresh board");
       if (res.ok) {
         const data = await res.json();
+        if (generation !== connectionGeneration.current) return;
         setCards(data.Cards || []);
         setBoardName(data.Name || "Untitled Board");
         if (data.OwnerID) {
@@ -114,9 +121,12 @@ export function useWebSocket(boardId: string, token: string | null) {
         }
       }
     } catch (err) {
+      if (generation !== connectionGeneration.current) return;
       console.error("Failed to fetch initial board state", err);
+      setErrorToast("Could not refresh the board. Please reload before editing.");
+      throw err;
     }
-  }, [boardId]);
+  }, [boardId, token]);
 
   const tokenRef = useRef<string | null>(token);
   const isMountedRef = useRef<boolean>(true);
@@ -129,6 +139,7 @@ export function useWebSocket(boardId: string, token: string | null) {
     if (!isMountedRef.current) return;
 
     closeAllSockets();
+    const generation = connectionGeneration.current;
 
     setStatus("connecting");
 
@@ -154,22 +165,29 @@ export function useWebSocket(boardId: string, token: string | null) {
       }
     }
 
-    if (!isMountedRef.current) return;
+    if (!isMountedRef.current || generation !== connectionGeneration.current) return;
 
     const socket = new WebSocket(wsUrl);
     ws.current = socket;
     activeSocketsRef.current.add(socket);
 
-    socket.onopen = () => {
+    socket.onopen = async () => {
       if (!isMountedRef.current) {
         socket.close(1000, "Unmounted");
         activeSocketsRef.current.delete(socket);
         return;
       }
       console.log("Connected to WebSocket");
-      setStatus("connected");
       reconnectDelay.current = 1000;
-      fetchBoard();
+      try {
+        await fetchBoard();
+        if (ws.current !== socket || socket.readyState !== WebSocket.OPEN) return;
+        readyToEdit.current = true;
+        setErrorToast(null);
+        setStatus("connected");
+      } catch {
+        socket.close();
+      }
     };
 
     socket.onmessage = (event) => {
@@ -178,13 +196,20 @@ export function useWebSocket(boardId: string, token: string | null) {
         if (data.boardId && data.boardId !== boardId) return;
 
         if (data.type === "ACCESS_GRANTED" || data.type === "ACCESS_REQUESTED") {
-          fetchBoard();
+          void fetchBoard().catch(() => {});
           return;
         }
 
         if (data.type === "ERROR") {
           setErrorToast(data.title || "An error occurred");
-          setTimeout(() => setErrorToast(null), 5000);
+          readyToEdit.current = false;
+          setStatus("connecting");
+          void fetchBoard().then(() => {
+            if (ws.current === socket && socket.readyState === WebSocket.OPEN) {
+              readyToEdit.current = true;
+              setStatus("connected");
+            }
+          }).catch(() => socket.close());
           return;
         }
 
@@ -225,6 +250,7 @@ export function useWebSocket(boardId: string, token: string | null) {
               Description: data.description !== undefined ? data.description : c.Description,
               DueDate: data.dueDate !== undefined ? data.dueDate : c.DueDate,
               Checklist: data.checklist !== undefined ? data.checklist : c.Checklist,
+              Swimlane: data.swimlane !== undefined ? data.swimlane : c.Swimlane,
               Tags: (data.tags !== undefined && data.tags !== "") ? data.tags : c.Tags
             } : c))
           );
@@ -277,7 +303,7 @@ export function useWebSocket(boardId: string, token: string | null) {
         } else if (data.swimlanes !== undefined) {
           const swimList = data.swimlanes ? data.swimlanes.split(",").map((s: string) => s.trim()).filter(Boolean) : [];
           setSwimlanes(swimList);
-          fetchBoard();
+          void fetchBoard().catch(() => {});
         }
       } catch (err) {
         console.error("Failed to parse WS message", err);
@@ -285,6 +311,7 @@ export function useWebSocket(boardId: string, token: string | null) {
     };
 
     socket.onclose = () => {
+      readyToEdit.current = false;
       activeSocketsRef.current.delete(socket);
       if (!isMountedRef.current) return;
       setStatus("disconnected");
@@ -298,6 +325,7 @@ export function useWebSocket(boardId: string, token: string | null) {
     };
 
     socket.onerror = (err) => {
+      readyToEdit.current = false;
       activeSocketsRef.current.delete(socket);
       console.error("WebSocket error", err);
       if (isMountedRef.current) {
@@ -308,7 +336,6 @@ export function useWebSocket(boardId: string, token: string | null) {
 
   useEffect(() => {
     isMountedRef.current = true;
-    fetchBoard();
     connect();
     return () => {
       isMountedRef.current = false;
@@ -320,15 +347,27 @@ export function useWebSocket(boardId: string, token: string | null) {
     };
   }, [connect, fetchBoard, closeAllSockets]);
 
-  const sendWsMsg = (payload: any) => {
-    if (ws.current?.readyState === WebSocket.OPEN) {
-      const urlParams = new URLSearchParams(window.location.search);
-      const inviteToken = urlParams.get("inviteToken") || "";
-      ws.current.send(JSON.stringify({ ...payload, inviteToken }));
+  const sendWsMsg = useCallback((payload: Record<string, unknown>) => {
+    if (!readyToEdit.current || ws.current?.readyState !== WebSocket.OPEN) {
+      setErrorToast("Change not sent. Wait for the board to reconnect, then try again.");
+      return false;
     }
-  };
+    try {
+      const inviteToken = new URLSearchParams(window.location.search).get("inviteToken") || "";
+      ws.current.send(JSON.stringify({ ...payload, inviteToken }));
+      setErrorToast(null);
+      return true;
+    } catch {
+      readyToEdit.current = false;
+      setStatus("disconnected");
+      setErrorToast("Change not sent. Reconnecting — please try again when connected.");
+      ws.current?.close();
+      return false;
+    }
+  }, []);
 
   const moveCard = useCallback((cardId: string, toList: string, position?: number, swimlane?: string) => {
+    if (!sendWsMsg({ type: "MOVE_CARD", cardId, toList, position, swimlane })) return;
     setCards((prev) =>
       prev
         .map((c) => (c.ID.toString() === cardId ? {
@@ -339,7 +378,6 @@ export function useWebSocket(boardId: string, token: string | null) {
         } : c))
         .sort((a, b) => (a.Position ?? 0) - (b.Position ?? 0))
     );
-    sendWsMsg({ type: "MOVE_CARD", cardId, toList, position, swimlane });
   }, [sendWsMsg]);
 
   const addCard = useCallback((title: string, list: string, position?: number, swimlane?: string) => {
@@ -347,54 +385,52 @@ export function useWebSocket(boardId: string, token: string | null) {
   }, [sendWsMsg]);
 
   const editCard = useCallback((cardId: string, title: string, tags?: string) => {
-    setCards((prev) => {
-      const targetCard = prev.find((c) => c.ID.toString() === cardId);
-      const currentTags = tags !== undefined ? tags : (targetCard?.Tags || "");
-      sendWsMsg({ type: "EDIT_CARD", cardId, title, tags: currentTags });
-      return prev.map((c) => (c.ID.toString() === cardId ? { ...c, Title: title, Tags: currentTags } : c));
-    });
-  }, [sendWsMsg]);
+    const currentTags = tags ?? cards.find((c) => String(c.ID) === cardId)?.Tags ?? "";
+    if (!sendWsMsg({ type: "EDIT_CARD", cardId, title, tags: currentTags })) return;
+    setCards((prev) => prev.map((c) => String(c.ID) === cardId ? { ...c, Title: title, Tags: currentTags } : c));
+  }, [sendWsMsg, cards]);
 
   const updateCardTags = useCallback((cardId: string, tags: string) => {
+    if (!sendWsMsg({ type: "UPDATE_CARD_TAGS", cardId, tags })) return;
     setCards((prev) => {
-      sendWsMsg({ type: "UPDATE_CARD_TAGS", cardId, tags });
       return prev.map((c) => (c.ID.toString() === cardId ? { ...c, Tags: tags } : c));
     });
   }, [sendWsMsg]);
 
   const deleteCard = useCallback((cardId: string) => {
+    if (!sendWsMsg({ type: "DELETE_CARD", cardId })) return;
     setCards((prev) => prev.filter((c) => c.ID.toString() !== cardId));
-    sendWsMsg({ type: "DELETE_CARD", cardId });
   }, [sendWsMsg]);
 
   const updateBoardName = useCallback((name: string) => {
+    if (!sendWsMsg({ type: "UPDATE_BOARD_NAME", boardName: name })) return;
     setBoardName(name);
-    sendWsMsg({ type: "UPDATE_BOARD_NAME", boardName: name });
   }, [sendWsMsg]);
 
   const addColumn = useCallback((columnName: string) => {
+    if (!sendWsMsg({ type: "ADD_COLUMN", columnName })) return;
     setColumns((prev) => [...prev, columnName]);
-    sendWsMsg({ type: "ADD_COLUMN", columnName });
   }, [sendWsMsg]);
 
   const deleteColumn = useCallback((columnName: string) => {
+    if (!sendWsMsg({ type: "DELETE_COLUMN", columnName })) return;
     setColumns((prev) => prev.filter((c) => c !== columnName));
     setCards((prev) => prev.filter((c) => c.List !== columnName));
-    sendWsMsg({ type: "DELETE_COLUMN", columnName });
   }, [sendWsMsg]);
 
   const renameColumn = useCallback((oldColumn: string, columnName: string) => {
+    if (!sendWsMsg({ type: "RENAME_COLUMN", oldColumn, columnName })) return;
     setColumns((prev) => prev.map((c) => (c === oldColumn ? columnName : c)));
     setCards((prev) => prev.map((c) => (c.List === oldColumn ? { ...c, List: columnName } : c)));
-    sendWsMsg({ type: "RENAME_COLUMN", oldColumn, columnName });
   }, [sendWsMsg]);
 
   const addSwimlane = useCallback((swimlane: string) => {
+    if (!sendWsMsg({ type: "ADD_SWIMLANE", swimlane })) return;
     setSwimlanes((prev) => [...prev, swimlane]);
-    sendWsMsg({ type: "ADD_SWIMLANE", swimlane });
   }, [sendWsMsg]);
 
   const deleteSwimlane = useCallback((swimlane: string) => {
+    if (!sendWsMsg({ type: "DELETE_SWIMLANE", swimlane })) return;
     setSwimlanes((prev) => {
       const remaining = prev.filter((s) => s !== swimlane);
       const fallbackSwim = remaining.length > 0 ? remaining[0] : "Untitled";
@@ -405,10 +441,10 @@ export function useWebSocket(boardId: string, token: string | null) {
       );
       return remaining;
     });
-    sendWsMsg({ type: "DELETE_SWIMLANE", swimlane });
   }, [sendWsMsg]);
 
   const renameSwimlane = useCallback((oldSwimlane: string, swimlane: string) => {
+    if (!sendWsMsg({ type: "RENAME_SWIMLANE", oldSwimlane, swimlane })) return;
     setSwimlanes((prev) => prev.map((s) => (s === oldSwimlane ? swimlane : s)));
     setCards((prev) => prev.map((c) => {
       const cardSwim = (c.Swimlane || "").trim();
@@ -417,55 +453,52 @@ export function useWebSocket(boardId: string, token: string | null) {
       }
       return c;
     }));
-    sendWsMsg({ type: "RENAME_SWIMLANE", oldSwimlane, swimlane });
   }, [sendWsMsg, swimlanes]);
 
   const updateBoardAccess = useCallback((level: "edit" | "view" | "private") => {
+    if (!sendWsMsg({ type: "UPDATE_BOARD_ACCESS", accessLevel: level })) return;
     setAccessLevel(level);
-    sendWsMsg({ type: "UPDATE_BOARD_ACCESS", accessLevel: level });
   }, [sendWsMsg]);
 
   const updateBoardBackground = useCallback((bg: string) => {
+    if (!sendWsMsg({ type: "UPDATE_BOARD_BACKGROUND", background: bg })) return;
     setBoardBackground(bg);
-    sendWsMsg({ type: "UPDATE_BOARD_BACKGROUND", background: bg });
   }, [sendWsMsg]);
 
   const editCardDetail = useCallback((cardId: string, details: { title?: string; description?: string; dueDate?: string; checklist?: string; tags?: string; swimlane?: string }) => {
-    setCards((prev) => {
-      const targetCard = prev.find((c) => c.ID.toString() === cardId);
-      const updatedTitle = details.title !== undefined ? details.title : (targetCard?.Title || "");
-      const updatedDescription = details.description !== undefined ? details.description : (targetCard?.Description || "");
-      const updatedDueDate = details.dueDate !== undefined ? details.dueDate : (targetCard?.DueDate || "");
-      const updatedChecklist = details.checklist !== undefined ? details.checklist : (targetCard?.Checklist || "");
-      const updatedTags = details.tags !== undefined ? details.tags : (targetCard?.Tags || "");
-      const updatedSwimlane = details.swimlane !== undefined ? details.swimlane : (targetCard?.Swimlane || "Untitled");
+    const targetCard = cards.find((c) => c.ID.toString() === cardId);
+    const updatedTitle = details.title !== undefined ? details.title : (targetCard?.Title || "");
+    const updatedDescription = details.description !== undefined ? details.description : (targetCard?.Description || "");
+    const updatedDueDate = details.dueDate !== undefined ? details.dueDate : (targetCard?.DueDate || "");
+    const updatedChecklist = details.checklist !== undefined ? details.checklist : (targetCard?.Checklist || "");
+    const updatedTags = details.tags !== undefined ? details.tags : (targetCard?.Tags || "");
+    const updatedSwimlane = details.swimlane !== undefined ? details.swimlane : (targetCard?.Swimlane || "Untitled");
 
-      sendWsMsg({
-        type: "EDIT_CARD",
-        cardId,
-        title: updatedTitle,
-        description: updatedDescription,
-        dueDate: updatedDueDate,
-        checklist: updatedChecklist,
-        tags: updatedTags,
-        swimlane: updatedSwimlane,
-      });
+    if (!sendWsMsg({
+      type: "EDIT_CARD",
+      cardId,
+      title: updatedTitle,
+      description: updatedDescription,
+      dueDate: updatedDueDate,
+      checklist: updatedChecklist,
+      tags: updatedTags,
+      swimlane: updatedSwimlane,
+    })) return;
 
-      return prev.map((c) =>
-        c.ID.toString() === cardId
-          ? {
-              ...c,
-              Title: updatedTitle,
-              Description: updatedDescription,
-              DueDate: updatedDueDate,
-              Checklist: updatedChecklist,
-              Tags: updatedTags,
-              Swimlane: updatedSwimlane,
-            }
-          : c
-      );
-    });
-  }, [sendWsMsg]);
+    setCards((prev) => prev.map((c) =>
+      c.ID.toString() === cardId
+        ? {
+            ...c,
+            Title: updatedTitle,
+            Description: updatedDescription,
+            DueDate: updatedDueDate,
+            Checklist: updatedChecklist,
+            Tags: updatedTags,
+            Swimlane: updatedSwimlane,
+          }
+        : c
+    ));
+  }, [sendWsMsg, cards]);
 
   return {
     cards,

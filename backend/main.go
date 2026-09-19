@@ -417,27 +417,22 @@ func main() {
 	r.POST("/api/boards", authMiddleware, func(c *gin.Context) {
 		userID := c.MustGet("userID").(uint)
 		var req struct {
-			Name string `json:"name"`
+			Name     string `json:"name"`
+			Template string `json:"template"`
 		}
-		if err := c.BindJSON(&req); err != nil {
+		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(400, gin.H{"error": "Invalid payload"})
 			return
 		}
-
-		newUUID := uuid.New().String()
-		board := Board{
-			ID:      newUUID,
-			Name:    req.Name,
-			OwnerID: userID,
+		if req.Template != "" && req.Template != "demo" {
+			c.JSON(400, gin.H{"error": "Unknown board template"})
+			return
 		}
-		db.Create(&board)
-
-		db.Create(&BoardMember{
-			BoardID:  newUUID,
-			UserID:   userID,
-			Role:     "owner",
-			LastSeen: time.Now(),
-		})
+		board, err := createBoard(db, userID, req.Name, req.Template == "demo")
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Could not create board"})
+			return
+		}
 
 		c.JSON(200, board)
 	})

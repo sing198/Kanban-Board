@@ -215,6 +215,30 @@ export default function Dashboard() {
     }
   };
 
+  const [isStartingDemo, setIsStartingDemo] = useState(false);
+  const [demoError, setDemoError] = useState<string | null>(null);
+
+  const startDemo = async () => {
+    if (isStartingDemo) return;
+    setIsStartingDemo(true);
+    setDemoError(null);
+    try {
+      const demoToken = await login("guest");
+      const res = await fetch(`${API_URL}/api/boards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${demoToken}` },
+        body: JSON.stringify({ template: "demo" }),
+      });
+      if (!res.ok) throw new Error("Could not create the demo board. Please try again.");
+      const board = await res.json();
+      navigate(`/b/${board.ID}`);
+    } catch (error) {
+      setDemoError(error instanceof Error ? error.message : "Could not start demo.");
+    } finally {
+      setIsStartingDemo(false);
+    }
+  };
+
   const createNewBoard = async () => {
     try {
       const res = await fetch(`${API_URL}/api/boards`, {
@@ -338,9 +362,10 @@ export default function Dashboard() {
           </div>
 
           <p className="text-slate-400 text-xs leading-relaxed max-w-xs">
-            Collaborative Kanban workspace with zero-latency WebSocket sync, custom swimlanes, and role-based permissions.
+            Collaborative Kanban workspace with live updates, custom swimlanes, and role-based permissions.
           </p>
 
+          {demoError && <p role="alert" className="text-sm text-rose-300">{demoError}</p>}
           {/* Action Buttons Stack */}
           <div className="w-full flex flex-col gap-3 pt-2">
             <button
@@ -352,11 +377,12 @@ export default function Dashboard() {
             </button>
 
             <button
-              onClick={() => login("guest")}
+              onClick={startDemo}
+              disabled={isStartingDemo}
               className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold hover:from-blue-500 hover:to-indigo-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 hover:scale-[1.02] active:scale-[0.98] text-sm cursor-pointer"
             >
               <Sparkles size={16} />
-              Guest
+              {isStartingDemo ? "Preparing your board…" : "Try a demo — no sign-up"}
             </button>
           </div>
         </div>
@@ -368,6 +394,8 @@ export default function Dashboard() {
     <div className={`min-h-screen font-sans flex flex-col transition-colors duration-200 selection:bg-blue-500/20 ${theme === "dark" ? "bg-[#090d16] text-[#f8fafc]" : "bg-[#f8fafc] text-slate-900"
       }`}>
 
+      {demoError && <div role="alert" className="bg-rose-100 text-rose-900 p-4">{demoError} <button onClick={startDemo} disabled={isStartingDemo} className="underline">Retry demo</button></div>}
+      {isStartingDemo && <div role="status" className="bg-blue-100 text-blue-900 p-4">Preparing your demo board…</div>}
       {/* HEADER */}
       <header className={`px-8 py-4 border-b flex items-center justify-between backdrop-blur-md sticky top-0 z-20 transition-colors ${theme === "dark" ? "bg-[#0f172a]/95 border-[#1e293b]" : "bg-white border-gray-200 shadow-xs"
         }`}>
