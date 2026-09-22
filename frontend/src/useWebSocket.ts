@@ -14,6 +14,10 @@ export type Card = {
   Tags?: string;
 };
 
+export type UserPresence = { id: number; name: string; avatarUrl: string };
+
+export type MutationFeedback = { id: string; label: string; state: "saving" | "saved" | "error" | "unknown"; message?: string };
+
 export type BoardState = Card[];
 
 export type ConnectionStatus = "connecting" | "connected" | "disconnected";
@@ -49,6 +53,27 @@ export function useWebSocket(boardId: string, token: string | null) {
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [errorToast, setErrorToast] = useState<string | null>(null);
 
+  const [boardError, setBoardError] = useState<"missing" | "forbidden" | null>(null);
+  const terminalError = useRef(false);
+  const [onlineUsers, setOnlineUsers] = useState<UserPresence[]>([]);
+  const [operations, setOperations] = useState<MutationFeedback[]>([]);
+  const pending = useRef(new Map<string, { payload: Record<string, unknown>; timer?: ReturnType<typeof setTimeout> }>());
+  const [pendingDeletes, setPendingDeletes] = useState<string[]>([]);
+  const deleteTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const finishOperation = (id: string, state: MutationFeedback["state"], message?: string) => {
+    const entry = pending.current.get(id);
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    entry.timer = undefined;
+    if (state === "saved") pending.current.delete(id);
+    setOperations(prev => prev.map(op => op.id === id ? { ...op, state, message } : op));
+  };
+  const markUncertain = () => {
+    pending.current.forEach((entry, id) => {
+      if (entry.timer) { finishOperation(id, "unknown", "Confirmation lost. Refresh the board to check before repeating this change."); entry.timer = undefined; }
+    });
+  };
+
   const ws = useRef<WebSocket | null>(null);
   const readyToEdit = useRef(false);
   const connectionGeneration = useRef(0);
@@ -78,11 +103,20 @@ export function useWebSocket(boardId: string, token: string | null) {
       const headers: Record<string, string> = jwtToken ? { Authorization: `Bearer ${jwtToken}` } : {};
 
       // 1. ดึงข้อมูล Board
-      const res = await fetch(`${API_URL}/api/boards/${boardId}`, {
+      const res = await fetch(`${API_URL}/api/boards/${boardId}?inviteToken=${encodeURIComponent(new URLSearchParams(window.location.search).get("inviteToken") || "")}`, {
         headers,
       });
+      if (generation !== connectionGeneration.current) return;
+      if ([401,403,404].includes(res.status)) {
+        terminalError.current = true;
+        readyToEdit.current = false;
+        setBoardError(res.status === 404 ? "missing" : "forbidden");
+        setCards([]); setOnlineUsers([]); setStatus("disconnected");
+        throw new Error("Board unavailable");
+      }
       if (!res.ok) throw new Error("Unable to refresh board");
       if (res.ok) {
+        setBoardError(null);
         const data = await res.json();
         if (generation !== connectionGeneration.current) return;
         setCards(data.Cards || []);
@@ -122,6 +156,7 @@ export function useWebSocket(boardId: string, token: string | null) {
       }
     } catch (err) {
       if (generation !== connectionGeneration.current) return;
+      if (terminalError.current) throw err;
       console.error("Failed to fetch initial board state", err);
       setErrorToast("Could not refresh the board. Please reload before editing.");
       throw err;
@@ -143,8 +178,10 @@ export function useWebSocket(boardId: string, token: string | null) {
 
     setStatus("connecting");
 
+    try { await fetchBoard(); } catch { if (terminalError.current) return; }
+    if (!isMountedRef.current || generation !== connectionGeneration.current) return;
     const currentToken = tokenRef.current;
-    let wsUrl = `${WS_URL}/ws?boardId=${boardId}`;
+    let wsUrl = `${WS_URL}/ws?boardId=${boardId}&inviteToken=${encodeURIComponent(new URLSearchParams(window.location.search).get("inviteToken") || "")}`;
 
     if (currentToken) {
       try {
@@ -195,6 +232,15 @@ export function useWebSocket(boardId: string, token: string | null) {
         const data = JSON.parse(event.data);
         if (data.boardId && data.boardId !== boardId) return;
 
+        if (data.type === "PRESENCE") {
+          setOnlineUsers(Array.isArray(data.users) ? data.users : []);
+          return;
+        }
+
+        if (data.requestId && pending.current.has(data.requestId)) {
+          finishOperation(data.requestId, data.type === "ERROR" ? "error" : "saved", data.type === "ERROR" ? data.title : undefined);
+        }
+
         if (data.type === "ACCESS_GRANTED" || data.type === "ACCESS_REQUESTED") {
           void fetchBoard().catch(() => {});
           return;
@@ -243,6 +289,13 @@ export function useWebSocket(boardId: string, token: string | null) {
             return [...prev, data.card].sort((a, b) => (a.Position ?? 0) - (b.Position ?? 0));
           });
         } else if (data.type === "EDIT_CARD") {
+          if (data.changes) {
+            const fields: Record<string,string> = {title:"Title",description:"Description",dueDate:"DueDate",checklist:"Checklist",tags:"Tags",swimlane:"Swimlane"};
+            const patch = Object.fromEntries(Object.entries(data.changes).filter(([key])=>fields[key]).map(([key,value])=>[fields[key],value]));
+            setCards(prev=>prev.map(c=>String(c.ID)===data.cardId ? {...c,...patch} : c));
+            return;
+          }
+
           setCards((prev) =>
             prev.map((c) => (c.ID.toString() === data.cardId ? {
               ...c,
@@ -311,9 +364,11 @@ export function useWebSocket(boardId: string, token: string | null) {
     };
 
     socket.onclose = () => {
+      setOnlineUsers([]);
+      markUncertain();
       readyToEdit.current = false;
       activeSocketsRef.current.delete(socket);
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || terminalError.current) return;
       setStatus("disconnected");
       console.log(`WebSocket disconnected. Reconnecting in ${reconnectDelay.current}ms...`);
       reconnectTimeout.current = setTimeout(() => {
@@ -336,6 +391,8 @@ export function useWebSocket(boardId: string, token: string | null) {
 
   useEffect(() => {
     isMountedRef.current = true;
+    terminalError.current = false;
+    setBoardError(null);
     connect();
     return () => {
       isMountedRef.current = false;
@@ -344,20 +401,40 @@ export function useWebSocket(boardId: string, token: string | null) {
         reconnectTimeout.current = null;
       }
       closeAllSockets();
+      pending.current.forEach(entry => clearTimeout(entry.timer));
+      pending.current.clear();
+      deleteTimers.current.forEach(timer => clearTimeout(timer));
+      deleteTimers.current.clear();
     };
   }, [connect, fetchBoard, closeAllSockets]);
 
   const sendWsMsg = useCallback((payload: Record<string, unknown>) => {
+    const tracked = ["ADD_CARD", "EDIT_CARD", "DELETE_CARD", "MOVE_CARD", "UPDATE_CARD_TAGS"].includes(String(payload.type));
+    const requestId = tracked ? crypto.randomUUID() : undefined;
+    if (requestId) {
+      const label = ({ ADD_CARD: "Create task", EDIT_CARD: "Edit task", DELETE_CARD: "Delete task", MOVE_CARD: "Move task", UPDATE_CARD_TAGS: "Update tags" } as Record<string, string>)[String(payload.type)];
+      pending.current.set(requestId, { payload });
+      setOperations(prev => [...prev.filter(op => op.state !== "saved"), { id: requestId, label, state: "saving" }]);
+    }
     if (!readyToEdit.current || ws.current?.readyState !== WebSocket.OPEN) {
+      if (requestId) finishOperation(requestId, "error", "Not sent. Reconnect, then retry.");
       setErrorToast("Change not sent. Wait for the board to reconnect, then try again.");
       return false;
     }
     try {
       const inviteToken = new URLSearchParams(window.location.search).get("inviteToken") || "";
-      ws.current.send(JSON.stringify({ ...payload, inviteToken }));
+      ws.current.send(JSON.stringify({ ...payload, inviteToken, requestId }));
+      if (requestId) {
+        pending.current.get(requestId)!.timer = setTimeout(() => {
+          finishOperation(requestId, "unknown", "No confirmation received. Refresh to check before repeating this change.");
+          const entry = pending.current.get(requestId);
+          if (entry) entry.timer = undefined;
+        }, 10000);
+      }
       setErrorToast(null);
       return true;
     } catch {
+      if (requestId) finishOperation(requestId, "error", "Not sent. Reconnect, then retry.");
       readyToEdit.current = false;
       setStatus("disconnected");
       setErrorToast("Change not sent. Reconnecting — please try again when connected.");
@@ -384,11 +461,14 @@ export function useWebSocket(boardId: string, token: string | null) {
     sendWsMsg({ type: "ADD_CARD", title, toList: list, position, swimlane: swimlane || "Untitled" });
   }, [sendWsMsg]);
 
-  const editCard = useCallback((cardId: string, title: string, tags?: string) => {
-    const currentTags = tags ?? cards.find((c) => String(c.ID) === cardId)?.Tags ?? "";
-    if (!sendWsMsg({ type: "EDIT_CARD", cardId, title, tags: currentTags })) return;
-    setCards((prev) => prev.map((c) => String(c.ID) === cardId ? { ...c, Title: title, Tags: currentTags } : c));
-  }, [sendWsMsg, cards]);
+  const editCard = useCallback((cardId: string, title: string, tags?: string, expectedTitle?: string) => {
+    const card = cards.find(c => String(c.ID) === cardId);
+    const changes: Record<string,string> = { title };
+    const expected: Record<string,string> = { title: expectedTitle ?? card?.Title ?? "" };
+    if (tags !== undefined) { changes.tags = tags; expected.tags = card?.Tags || ""; }
+    if (!sendWsMsg({ type: "EDIT_CARD", cardId, changes, expected })) return;
+    setCards(prev => prev.map(c => String(c.ID) === cardId ? { ...c, Title: title, ...(tags === undefined ? {} : { Tags: tags }) } : c));
+  }, [cards, sendWsMsg]);
 
   const updateCardTags = useCallback((cardId: string, tags: string) => {
     if (!sendWsMsg({ type: "UPDATE_CARD_TAGS", cardId, tags })) return;
@@ -398,9 +478,30 @@ export function useWebSocket(boardId: string, token: string | null) {
   }, [sendWsMsg]);
 
   const deleteCard = useCallback((cardId: string) => {
-    if (!sendWsMsg({ type: "DELETE_CARD", cardId })) return;
-    setCards((prev) => prev.filter((c) => c.ID.toString() !== cardId));
+    if (!readyToEdit.current) { sendWsMsg({ type: "DELETE_CARD", cardId }); return; }
+    if (deleteTimers.current.has(cardId)) return;
+    setPendingDeletes(prev => [...prev, cardId]);
+    deleteTimers.current.set(cardId, setTimeout(() => {
+      deleteTimers.current.delete(cardId);
+      setPendingDeletes(prev => prev.filter(id => id !== cardId));
+      // Keep authoritative data until the server confirms deletion.
+      sendWsMsg({ type: "DELETE_CARD", cardId });
+    }, 6000));
   }, [sendWsMsg]);
+
+  const undoDelete = (cardId: string) => {
+    clearTimeout(deleteTimers.current.get(cardId));
+    deleteTimers.current.delete(cardId);
+    setPendingDeletes(prev => prev.filter(id => id !== cardId));
+  };
+  const retryOperation = (id: string) => {
+    const operation = operations.find(op => op.id === id);
+    const entry = pending.current.get(id);
+    if (!entry || operation?.state !== "error") return;
+    pending.current.delete(id);
+    setOperations(prev => prev.filter(op => op.id !== id));
+    sendWsMsg(entry.payload);
+  };
 
   const updateBoardName = useCallback((name: string) => {
     if (!sendWsMsg({ type: "UPDATE_BOARD_NAME", boardName: name })) return;
@@ -465,43 +566,29 @@ export function useWebSocket(boardId: string, token: string | null) {
     setBoardBackground(bg);
   }, [sendWsMsg]);
 
-  const editCardDetail = useCallback((cardId: string, details: { title?: string; description?: string; dueDate?: string; checklist?: string; tags?: string; swimlane?: string }) => {
-    const targetCard = cards.find((c) => c.ID.toString() === cardId);
-    const updatedTitle = details.title !== undefined ? details.title : (targetCard?.Title || "");
-    const updatedDescription = details.description !== undefined ? details.description : (targetCard?.Description || "");
-    const updatedDueDate = details.dueDate !== undefined ? details.dueDate : (targetCard?.DueDate || "");
-    const updatedChecklist = details.checklist !== undefined ? details.checklist : (targetCard?.Checklist || "");
-    const updatedTags = details.tags !== undefined ? details.tags : (targetCard?.Tags || "");
-    const updatedSwimlane = details.swimlane !== undefined ? details.swimlane : (targetCard?.Swimlane || "Untitled");
-
-    if (!sendWsMsg({
-      type: "EDIT_CARD",
-      cardId,
-      title: updatedTitle,
-      description: updatedDescription,
-      dueDate: updatedDueDate,
-      checklist: updatedChecklist,
-      tags: updatedTags,
-      swimlane: updatedSwimlane,
-    })) return;
-
-    setCards((prev) => prev.map((c) =>
-      c.ID.toString() === cardId
-        ? {
-            ...c,
-            Title: updatedTitle,
-            Description: updatedDescription,
-            DueDate: updatedDueDate,
-            Checklist: updatedChecklist,
-            Tags: updatedTags,
-            Swimlane: updatedSwimlane,
-          }
-        : c
-    ));
-  }, [sendWsMsg, cards]);
+  const editCardDetail = useCallback((cardId: string, details: { title?: string; description?: string; dueDate?: string; checklist?: string; tags?: string; swimlane?: string }, baseline?: Record<string,string>) => {
+    const targetCard = cards.find(c => String(c.ID) === cardId);
+    const fields: Record<string, keyof Card> = {title:"Title",description:"Description",dueDate:"DueDate",checklist:"Checklist",tags:"Tags",swimlane:"Swimlane"};
+    const changes: Record<string,string> = {}, expected: Record<string,string> = {};
+    const local: Partial<Card> = {};
+    for (const [key,value] of Object.entries(details)) {
+      if (value === undefined) continue;
+      changes[key] = value;
+      expected[key] = baseline?.[key] ?? String(targetCard?.[fields[key]] ?? "");
+      Object.assign(local, { [fields[key]]: value });
+    }
+    if (!sendWsMsg({type:"EDIT_CARD",cardId,changes,expected})) return;
+    setCards(prev => prev.map(c => String(c.ID) === cardId ? {...c,...local} : c));
+  }, [cards, sendWsMsg]);
 
   return {
-    cards,
+    boardError,
+    retryBoard: () => { terminalError.current = false; setBoardError(null); void connect(); },
+    onlineUsers,
+    operations, pendingDeletes, undoDelete, retryOperation,
+    refreshBoard: () => fetchBoard().catch(() => {}),
+    dismissOperation: (id: string) => { pending.current.delete(id); setOperations(prev => prev.filter(op => op.id !== id)); },
+    cards: cards.filter(card => !pendingDeletes.includes(String(card.ID)) && !operations.some(op => op.state === "saving" && pending.current.get(op.id)?.payload.type === "DELETE_CARD" && pending.current.get(op.id)?.payload.cardId === String(card.ID))),
     boardName,
     columns,
     swimlanes,

@@ -256,7 +256,11 @@ func main() {
 		}).Where("id = ?", id).First(&board).Error
 
 		if err != nil {
-			c.JSON(404, gin.H{"error": "Board not found"})
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				c.JSON(404, gin.H{"error": "Board not found"})
+			} else {
+				c.JSON(500, gin.H{"error": "Could not load board"})
+			}
 			return
 		}
 
@@ -294,6 +298,15 @@ func main() {
 					}
 				}
 			}
+		}
+
+		if board.AccessLevel == "private" && userRole != "owner" && userRole != "edit" && userRole != "view" {
+			inviteBoard, role, err := VerifyBoardInviteToken(c.Query("inviteToken"))
+			if err != nil || inviteBoard != id {
+				c.JSON(403, gin.H{"error": "Access denied"})
+				return
+			}
+			userRole = role
 		}
 
 		c.JSON(200, gin.H{

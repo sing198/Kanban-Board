@@ -4,7 +4,11 @@ A task board for small teams: organize work, move cards between stages, and see 
 
 **React + TypeScript · Go + Gin · WebSocket · GORM · Redis Pub/Sub**
 
-![Kanban board](screenshot/KanbanBoard.png)
+[Live demo](https://kanban-board-eta-five.vercel.app/) · [Deployment test report](docs/deployment-validation.md) · [Interview walkthrough](docs/portfolio-case-study.md)
+
+![Latest local board](screenshot/current/board.png)
+
+Screenshots show the current local implementation (20 September 2026). The hosted build inspected that day still showed the earlier dashboard and board UI; new local features are not yet verified on production.
 
 ## Try it in 60 seconds
 
@@ -15,7 +19,7 @@ Start the app using the instructions below, then open **http://localhost**.
 3. Open the same board URL in a second tab and watch a move appear in both views.
 4. Open a card to explore descriptions and tags.
 
-Each demo creates a separate board rather than modifying a shared sample. Guest sessions are temporary; use sample data. A hosted demo URL has not yet been configured in this repository.
+Each demo creates a separate board rather than modifying a shared sample. Guest sessions are temporary; use sample data. The [hosted demo](https://kanban-board-eta-five.vercel.app/) may run an earlier revision. For all features below, use the current local source.
 
 ## What to explore
 
@@ -23,11 +27,14 @@ Each demo creates a separate board rather than modifying a shared sample. Guest 
 - **Board organization:** draggable cards, custom columns, swimlanes, tags, due dates and checklists.
 - **Access control:** owner, editor and viewer roles, invite links, and access requests.
 - **Connection recovery:** mutations are blocked while disconnected or refreshing. Reconnect fetches server state; server error messages trigger a refresh to reconcile optimistic changes.
+- **Save feedback:** task mutations carry request IDs; successful server events confirm saves. Failed unsent/rejected changes can be retried. Uncertain sends require review, not automatic replay.
+- **Safer edits:** field-level patches preserve unrelated edits; expected values reject stale writes to the same field.
+- **Accessible task controls:** move via Column/Swimlane selectors, named icon controls, keyboard focus and Escape in task/confirmation dialogs.
+- **Undo:** task deletion waits six seconds before sending. Leaving the board during that window cancels the scheduled deletion.
+- **Live presence:** avatars update on joins/leaves, with signed-in users deduplicated across tabs on one backend instance.
 - **Guest demo:** a populated board without Google sign-in. Google OAuth is available when configured.
 
-![Dashboard](screenshot/KanbanDashboard.png)
-
-Screenshots show the existing interface; the new demo entry and connection messages may differ.
+![Latest local dashboard](screenshot/current/dashboard.png)
 
 ## Architecture
 
@@ -92,16 +99,19 @@ cd backend
 go test ./...
 ```
 
-Frontend regression tests simulate disconnected edits, a send failure, reconnection and server rejection. Backend tests cover WebSocket broadcasting, positioning, permissions and demo creation, including transaction rollback. See [manual demo checks](docs/portfolio-case-study.md#manual-demo-checks) for browser-level validation.
+Frontend regression tests cover connection recovery, correlated saves, retries, uncertain sends, Undo, terminal 403/404 handling and accessible task controls. Backend tests cover WebSocket broadcasting, positioning, permissions and demo creation, including transaction rollback, two-user mutation/presence flows and stale-field rejection. See [manual demo checks](docs/portfolio-case-study.md#manual-demo-checks) for browser-level validation.
 
 ## Engineering notes and limitations
 
-- Local `WebSocket.send()` success is not proof that the database committed a change. The current protocol has no per-mutation acknowledgement or durable offline queue.
-- Connection recovery reloads server state. Users must retry changes that were not sent; the app does not silently replay them.
-- Redis Pub/Sub alone does not make every feature multi-instance ready. WebSocket tickets and online presence are held in process memory; multi-instance deployment needs further design and validation.
-- Concurrent editing and event/snapshot ordering need further testing before claiming strong consistency or production scale.
+- Task confirmations are correlated server events after successful database writes, not exactly-once delivery. A lost confirmation leaves the result uncertain; refresh and inspect before repeating a create.
+- The app has no durable offline queue. Reconnect fetches server state; event/snapshot ordering and high contention still need stronger consistency work.
+- Field-level conflict checks apply to `EDIT_CARD` patches. Moves, whole checklist values, tags updated through their separate event, and board settings do not provide general collaborative document merging. Old clients do not supply expected values.
+- Presence and WebSocket tickets are process-local. Redis broadcasts mutations but does not make multi-instance presence or ticket routing correct automatically. Use one backend instance for the current validated setup.
+- Guest boards are temporary and subject to cleanup. Guest logout behavior differs between Board and Dashboard; never use the guest demo as permanent storage.
+- Local SQLite needs a persistent disk/volume to survive host replacement. The deployed QA board survived a Render backend restart on 20 September 2026; a post-restart write also survived reload, rechecked on 22 September. This does not verify host replacement or backup recovery. See the [deployment report](docs/deployment-validation.md).
+- Mobile checks use a 390px browser viewport, not a physical-device certification. Google login was exercised with an existing browser Google session, not every fresh-account, MFA or consent path.
 
-Read the [connection recovery case study](docs/portfolio-case-study.md) for the concrete problem, implementation and interview discussion points.
+See the [dated deployment report](docs/deployment-validation.md) for passed checks, blocked checks and the release gap.
 
 ## Development approach
 

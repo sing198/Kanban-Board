@@ -102,6 +102,16 @@ func (h *Hub) GetOnlineUsers(boardID string) []UserPresence {
 	return list
 }
 
+// Presence reflects open sockets on this server, grouped by signed-in user.
+func (h *Hub) broadcastPresence(boardID string) {
+	payload, _ := json.Marshal(struct {
+		Type    string         `json:"type"`
+		BoardID string         `json:"boardId"`
+		Users   []UserPresence `json:"users"`
+	}{"PRESENCE", boardID, h.GetOnlineUsers(boardID)})
+	h.broadcastRoom(boardID, payload)
+}
+
 // broadcastRoom sends a message ONLY to connected local clients in a specific board room.
 func (h *Hub) broadcastRoom(boardID string, message []byte) {
 	h.mu.RLock()
@@ -162,6 +172,7 @@ func (h *Hub) run() {
 			}
 			h.rooms[client.boardID][client] = true
 			h.mu.Unlock()
+			h.broadcastPresence(client.boardID)
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -175,6 +186,8 @@ func (h *Hub) run() {
 				}
 			}
 			h.mu.Unlock()
+
+			h.broadcastPresence(client.boardID)
 
 		case message := <-h.publish:
 			var msg WsMessage

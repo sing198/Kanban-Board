@@ -46,6 +46,11 @@ func TestHubBroadcastLocal(t *testing.T) {
 	// Give the run() goroutine time to process registrations.
 	time.Sleep(50 * time.Millisecond)
 
+	for _, client := range []*Client{c1, c2, c3} {
+		for len(client.send) > 0 {
+			<-client.send
+		}
+	}
 	payload := []byte(`{"type":"MOVE_CARD","boardId":"` + boardID + `","cardId":"1"}`)
 	hub.publish <- payload
 
@@ -83,8 +88,30 @@ func TestHubUnregister(t *testing.T) {
 
 	// After unregister the hub closes c1.send. A receive on a closed channel
 	// returns the zero value immediately with ok=false.
+	for len(c1.send) > 0 {
+		<-c1.send
+	}
 	_, ok := <-c1.send
 	if ok {
 		t.Errorf("expected c1.send to be closed after unregister")
 	}
+}
+
+func TestPresenceDeduplicatesUserTabs(t *testing.T) {
+	hub := newTestHub(t)
+	first, second := makeClient(hub, testBoardID), makeClient(hub, testBoardID)
+	first.userID, second.userID = 1, 1
+	first.userName, second.userName = "Alice", "Alice"
+	hub.register <- first
+	hub.register <- second
+	time.Sleep(20 * time.Millisecond)
+	if users := hub.GetOnlineUsers(testBoardID); len(users) != 1 {
+		t.Fatalf("Expected one person for two tabs, got %+v", users)
+	}
+	hub.unregister <- second
+	time.Sleep(20 * time.Millisecond)
+	if users := hub.GetOnlineUsers(testBoardID); len(users) != 1 {
+		t.Fatal("Closing one tab removed active user")
+	}
+	hub.unregister <- first
 }

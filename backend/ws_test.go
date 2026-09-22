@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -64,7 +65,7 @@ func TestWebSocketBroadcast(t *testing.T) {
 
 	ws2.SetReadDeadline(time.Now().Add(2 * time.Second))
 	var received WsMessage
-	if err := ws2.ReadJSON(&received); err != nil {
+	if err := readMutation(ws2, &received); err != nil {
 		t.Fatalf("Client 2 failed to read message: %v", err)
 	}
 
@@ -125,5 +126,191 @@ func TestServeWsAnonymousDoesNotCreateOrphanBoard(t *testing.T) {
 	db.Model(&Board{}).Where("id = ?", newBoard).Count(&count)
 	if count != 0 {
 		t.Errorf("anonymous connection created an orphan board")
+	}
+}
+
+func TestMutationConfirmationAndRejection(t *testing.T) {
+	db := newTestDB(t)
+	seedBoard(t, db, testBoardID, nil)
+	hub := newTestHub(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { serveWs(hub, db, w, r) }))
+	defer server.Close()
+	conn, _, err := websocket.DefaultDialer.Dial("ws"+server.URL[4:]+"?boardId="+testBoardID+"&ticket="+createWSTicket(1), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	if err := conn.WriteJSON(WsMessage{Type: "ADD_CARD", RequestID: "create-1", Title: "Confirmed", ToList: "TODO", Position: 1000}); err != nil {
+		t.Fatal(err)
+	}
+	var response WsMessage
+	if err := readMutation(conn, &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.RequestID != "create-1" || response.Card == nil || response.Card.ID == 0 {
+		t.Fatalf("Missing persisted confirmation: %+v", response)
+	}
+	var saved Card
+	if err := db.First(&saved, response.Card.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := conn.WriteJSON(WsMessage{Type: "EDIT_CARD", RequestID: "edit-missing", CardId: "999999", Title: "Missing"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := readMutation(conn, &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Type != "ERROR" || response.RequestID != "edit-missing" {
+		t.Fatalf("Expected correlated rejection: %+v", response)
+	}
+}
+
+func readMutation(conn *websocket.Conn, message *WsMessage) error {
+	for {
+		if err := conn.ReadJSON(message); err != nil {
+			return err
+		}
+		if message.Type != "PRESENCE" {
+			return nil
+		}
+	}
+}
+
+func TestTwoUsersRealtimeLifecycle(t *testing.T) {
+	db := newTestDB(t)
+	seedBoard(t, db, testBoardID, nil)
+	db.Model(&Board{}).Where("id = ?", testBoardID).Update("access_level", "edit")
+	hub := newTestHub(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { serveWs(hub, db, w, r) }))
+	defer server.Close()
+	dial := func(user uint) *websocket.Conn {
+		conn, _, err := websocket.DefaultDialer.Dial("ws"+server.URL[4:]+"?boardId="+testBoardID+"&ticket="+createWSTicket(user), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		return conn
+	}
+	first := dial(1)
+	defer first.Close()
+	second := dial(2)
+	defer second.Close()
+	var presence struct {
+		Type  string
+		Users []UserPresence
+	}
+	for {
+		if err := first.ReadJSON(&presence); err != nil {
+			t.Fatal(err)
+		}
+		if presence.Type == "PRESENCE" && len(presence.Users) == 2 {
+			break
+		}
+	}
+	if err := first.WriteJSON(WsMessage{Type: "ADD_CARD", Title: "Shared task", ToList: "TODO", Position: 1000}); err != nil {
+		t.Fatal(err)
+	}
+	var event WsMessage
+	if err := readMutation(second, &event); err != nil {
+		t.Fatal(err)
+	}
+	if event.Type != "ADD_CARD" || event.Card == nil {
+		t.Fatalf("Missing remote create: %+v", event)
+	}
+	id := fmt.Sprint(event.Card.ID)
+	if err := readMutation(first, &event); err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range []WsMessage{
+		{Type: "EDIT_CARD", CardId: id, Title: "Updated by user two", Description: "Shared description"},
+		{Type: "MOVE_CARD", CardId: id, ToList: "DONE", Position: 2000},
+		{Type: "DELETE_CARD", CardId: id},
+	} {
+		if err := second.WriteJSON(command); err != nil {
+			t.Fatal(err)
+		}
+		if err := readMutation(first, &event); err != nil {
+			t.Fatal(err)
+		}
+		if event.Type != command.Type && !(command.Type == "MOVE_CARD" && event.Type == "REORDER") {
+			t.Fatalf("Expected %s, got %+v", command.Type, event)
+		}
+	}
+	var count int64
+	db.Model(&Card{}).Where("board_id = ?", testBoardID).Count(&count)
+	if count != 0 {
+		t.Fatal("Delete was not persisted")
+	}
+	second.Close()
+	for {
+		if err := first.ReadJSON(&presence); err != nil {
+			t.Fatal(err)
+		}
+		if presence.Type == "PRESENCE" && len(presence.Users) == 1 {
+			break
+		}
+	}
+	if presence.Users[0].ID != 1 {
+		t.Fatal("Disconnected user remains present")
+	}
+}
+
+func TestConcurrentFieldEdits(t *testing.T) {
+	db := newTestDB(t)
+	seedBoard(t, db, testBoardID, []Card{{Title: "Original", List: "TODO", Description: "Before"}})
+	hub := newTestHub(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { serveWs(hub, db, w, r) }))
+	defer server.Close()
+	dial := func() *websocket.Conn {
+		c, _, err := websocket.DefaultDialer.Dial("ws"+server.URL[4:]+"?boardId="+testBoardID+"&ticket="+createWSTicket(1), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.SetReadDeadline(time.Now().Add(3 * time.Second))
+		return c
+	}
+	a, b := dial(), dial()
+	defer a.Close()
+	defer b.Close()
+	var response WsMessage
+	send := func(c *websocket.Conn, changes, expected map[string]string) {
+		if err := c.WriteJSON(WsMessage{Type: "EDIT_CARD", CardId: "1", Changes: changes, Expected: expected}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	send(a, map[string]string{"title": "New title"}, map[string]string{"title": "Original"})
+	if err := readMutation(a, &response); err != nil {
+		t.Fatal(err)
+	}
+	if err := readMutation(b, &response); err != nil {
+		t.Fatal(err)
+	}
+	send(b, map[string]string{"description": "New description"}, map[string]string{"description": "Before"})
+	if err := readMutation(a, &response); err != nil {
+		t.Fatal(err)
+	}
+	if err := readMutation(b, &response); err != nil {
+		t.Fatal(err)
+	}
+	var card Card
+	db.First(&card, 1)
+	if card.Title != "New title" || card.Description != "New description" {
+		t.Fatalf("Lost edit: %+v", card)
+	}
+	send(b, map[string]string{"title": "Stale overwrite"}, map[string]string{"title": "Original"})
+	if err := readMutation(b, &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Type != "ERROR" {
+		t.Fatalf("Stale edit accepted: %+v", response)
+	}
+	send(a, map[string]string{"description": ""}, map[string]string{"description": "New description"})
+	if err := readMutation(a, &response); err != nil {
+		t.Fatal(err)
+	}
+	db.First(&card, 1)
+	if card.Description != "" || card.Title != "New title" {
+		t.Fatalf("Clear field failed: %+v", card)
 	}
 }

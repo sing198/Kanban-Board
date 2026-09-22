@@ -18,7 +18,7 @@ import {
   arrayMove
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, Link as LinkIcon, Edit2, Trash2, LogOut, AlertCircle, Wifi, WifiOff, X, ChevronDown, ChevronRight, Sun, Moon, UserPlus, Globe, Code, Eye, Bell, Check, ArrowLeft, Download, Search, Tag, FileText, Image, Calendar, Clock, CheckSquare, Palette, LayoutDashboard, Layers3, ArrowUpRight, Sparkles } from "lucide-react";
+import { Plus, Link as LinkIcon, Edit2, Trash2, LogOut, AlertCircle, Wifi, WifiOff, X, ChevronDown, ChevronRight, Sun, Moon, UserPlus, Globe, Code, Eye, Bell, Check, ArrowLeft, Download, Search, Tag, FileText, Image, Calendar, Clock, CheckSquare, Palette, LayoutDashboard, Layers3 } from "lucide-react";
 import { toPng } from "html-to-image";
 
 import { useWebSocket } from "../useWebSocket";
@@ -26,12 +26,13 @@ import { useAuth } from "../useAuth";
 import { useTheme } from "../useTheme";
 import { useNotifications } from "../useNotifications";
 import { API_URL } from "../config";
+import WorkspaceSidebar from "../components/WorkspaceSidebar";
 
 function AvatarImage({ src, name, className, title }: { src: string; name: string; className: string; title?: string }) {
   const [failed, setFailed] = useState(false);
   if (failed || !src) {
     return (
-      <div 
+      <div
         className={`${className} bg-gradient-to-br from-[#4262ff] to-indigo-600 text-white font-extrabold flex items-center justify-center uppercase shadow-xs text-[10px]`}
         title={title || name}
       >
@@ -200,7 +201,7 @@ function DraggableCard({
   columnIndex: number,
   swimlaneName?: string,
   swimlaneIndex?: number,
-  onEdit: (id: string, newTitle: string) => void,
+  onEdit: (id: string, newTitle: string, expectedTitle?: string) => void,
   onUpdateTags?: (id: string, newTags: string) => void,
   onDelete: (id: string) => void,
   onOpenDetail?: (card: any) => void,
@@ -210,6 +211,7 @@ function DraggableCard({
 
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
+  const editBase = useRef(title);
   const [isTagPopoverOpen, setIsTagPopoverOpen] = useState(false);
   const [customTagInput, setCustomTagInput] = useState("");
 
@@ -226,7 +228,7 @@ function DraggableCard({
 
   const handleSave = () => {
     if (editTitle.trim() && editTitle.trim() !== title) {
-      onEdit(id, editTitle.trim());
+      onEdit(id, editTitle.trim(), editBase.current);
     } else {
       setEditTitle(title);
     }
@@ -246,6 +248,7 @@ function DraggableCard({
           ref={(el) => adjustHeight(el)}
           autoFocus
           rows={1}
+          aria-label="Task title"
           value={editTitle}
           onChange={(e) => {
             setEditTitle(e.target.value);
@@ -289,9 +292,9 @@ function DraggableCard({
       className={`board-task-card bg-white dark:bg-[#1e293b] border ${colStyle.cardBorder} p-4 rounded-2xl ${isTagPopoverOpen ? "cursor-default" : "cursor-pointer"} group transition-all duration-150 w-full max-w-full flex flex-col gap-2.5 shadow-xs hover:shadow-md relative`}
     >
       <div className="task-eyebrow"><span>TSK-{String(id).padStart(3, "0")}</span><span className="task-status-dot" style={{ background: ["#a7a9b8", "#9681ed", "#67b09e"][columnIndex % 3] }} /></div>
-      <p className={`text-sm font-semibold text-slate-800 dark:text-slate-100 w-full min-w-0 [overflow-wrap:anywhere] [word-break:break-word] whitespace-pre-wrap leading-relaxed ${canEdit ? "pr-6" : ""}`}>
+      <button type="button" aria-label={`Open task: ${title}`} onPointerDown={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onOpenDetail?.(cardData); }} className={`task-title-button text-left text-sm font-semibold text-slate-800 dark:text-slate-100 w-full min-w-0 [overflow-wrap:anywhere] [word-break:break-word] whitespace-pre-wrap leading-relaxed ${canEdit ? "pr-6" : ""}`}>
         {title}
-      </p>
+      </button>
 
       {cardData.Description && <p className="task-description">{cardData.Description}</p>}
       {canEdit && (
@@ -302,10 +305,11 @@ function DraggableCard({
             onClick={(e) => {
               e.stopPropagation();
               setEditTitle(title);
+              editBase.current = title;
               setIsEditing(true);
             }}
             className="p-1 text-slate-400 hover:text-blue-500 dark:hover:text-sky-400 rounded transition-colors"
-            title="Rename Task"
+            aria-label="Rename Task" title="Rename Task"
           >
             <Edit2 size={13} />
           </button>
@@ -317,7 +321,7 @@ function DraggableCard({
               onDelete(id);
             }}
             className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded transition-colors"
-            title="Delete Task"
+            aria-label="Delete Task" title="Delete Task"
           >
             <Trash2 size={13} />
           </button>
@@ -541,11 +545,13 @@ const decodeInviteRole = (tokenStr: string | null): "edit" | "view" | null => {
   }
 };
 
-function CardDetailModal({
+export function CardDetailModal({
   card,
   canEdit,
   theme,
   swimlanes,
+  columns,
+  onMove,
   onClose,
   onEditDetail,
   onDeleteCard,
@@ -554,10 +560,23 @@ function CardDetailModal({
   canEdit: boolean;
   theme: string;
   swimlanes: string[];
+  columns: string[];
+  onMove: (cardId: string, column: string) => void;
   onClose: () => void;
-  onEditDetail: (cardId: string, details: any) => void;
+  onEditDetail: (cardId: string, details: any, baseline?: Record<string,string>) => void;
   onDeleteCard: (cardId: string, title: string) => void;
 }) {
+  const baseline = useRef<Record<string,string>>({title:card.Title || "",description:card.Description || "",dueDate:card.DueDate || "",checklist:card.Checklist || "",tags:card.Tags || "",swimlane:card.Swimlane || ""});
+  const saveDetail = (id: string, changes: Record<string,string>) => {
+    onEditDetail(id, changes, { ...baseline.current });
+    Object.assign(baseline.current, changes);
+  };
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    dialogRef.current?.querySelector<HTMLElement>("input, button, select")?.focus();
+    return () => { if (previous?.isConnected) previous.focus(); };
+  }, []);
   const [title, setTitle] = useState(card.Title || "");
   const [description, setDescription] = useState(card.Description || "");
   const [dueDate, setDueDate] = useState(card.DueDate || "");
@@ -575,13 +594,13 @@ function CardDetailModal({
 
   const handleSaveTitle = () => {
     if (title.trim() && title.trim() !== card.Title) {
-      onEditDetail(cardId, { title: title.trim() });
+      saveDetail(cardId, { title: title.trim() });
     }
   };
 
   const handleSaveDescription = () => {
     if (description !== card.Description) {
-      onEditDetail(cardId, { description });
+      saveDetail(cardId, { description });
     }
   };
 
@@ -596,6 +615,16 @@ function CardDetailModal({
       onClick={onClose}
     >
       <div
+        ref={dialogRef} role="dialog" aria-modal="true" aria-label="Task details"
+        onKeyDown={event => {
+          if (event.key === "Escape") { event.stopPropagation(); onClose(); }
+          if (event.key === "Tab") {
+            const elements = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex="0"]') || []);
+            const first = elements[0], last = elements[elements.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+          }
+        }}
         className={`w-full max-w-2xl rounded-3xl border shadow-2xl p-6 flex flex-col gap-5 my-8 max-h-[90vh] overflow-y-auto ${
           theme === "dark" ? "bg-[#1e293b] border-[#334155] text-slate-100" : "bg-white border-gray-200 text-slate-800"
         }`}
@@ -613,23 +642,24 @@ function CardDetailModal({
               className={`text-lg font-bold bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg px-1 py-0.5 w-full ${
                 theme === "dark" ? "text-slate-100" : "text-slate-900"
               }`}
-              placeholder="Task title..."
+              aria-label="Task title" placeholder="Task title..."
             />
             <div className="flex items-center gap-2 text-xs">
               <span className={`px-2.5 py-0.5 rounded-lg font-bold ${
                 theme === "dark" ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"
               }`}>
-                List: {card.List}
+                <label>Column: <select aria-label="Move task to column" disabled={!canEdit} value={card.List} onChange={event => onMove(cardId, event.target.value)} className="bg-transparent rounded px-1">{columns.map(column => <option key={column} value={column}>{column}</option>)}</select></label>
               </span>
               {swimlanes.length > 0 ? (
                 <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-lg font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
                   <span className="opacity-75">Swimlane:</span>
                   <select
+                    aria-label="Move task to swimlane"
                     disabled={!canEdit}
                     value={effectiveSwimlane}
                     onChange={(e) => {
                       const newSwim = e.target.value;
-                      onEditDetail(cardId, { swimlane: newSwim });
+                      saveDetail(cardId, { swimlane: newSwim });
                     }}
                     className="bg-transparent font-bold focus:outline-none cursor-pointer"
                   >
@@ -649,6 +679,7 @@ function CardDetailModal({
           </div>
 
           <button
+            aria-label="Close task details"
             onClick={onClose}
             className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl transition-colors cursor-pointer"
           >
@@ -662,12 +693,12 @@ function CardDetailModal({
             <Calendar size={15} className="text-blue-500" />
             <span>Due Date:</span>
             <input
-              type="date"
+              aria-label="Due date" type="date"
               disabled={!canEdit}
               value={dueDate}
               onChange={(e) => {
                 setDueDate(e.target.value);
-                onEditDetail(cardId, { dueDate: e.target.value });
+                saveDetail(cardId, { dueDate: e.target.value });
               }}
               className={`px-3 py-1.5 rounded-xl border text-xs font-bold focus:outline-none ${
                 theme === "dark" ? "bg-slate-800 border-slate-700 text-slate-100" : "bg-gray-50 border-gray-200 text-slate-800"
@@ -690,7 +721,7 @@ function CardDetailModal({
           <textarea
             rows={3}
             readOnly={!canEdit}
-            placeholder="Add a more detailed description..."
+            aria-label="Task description" placeholder="Add a more detailed description..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             onBlur={handleSaveDescription}
@@ -726,13 +757,13 @@ function CardDetailModal({
             {checklist.map((item, idx) => (
               <div key={item.id || idx} className="flex items-center gap-2.5 group">
                 <input
-                  type="checkbox"
+                  aria-label={`Complete ${item.text}`} type="checkbox"
                   disabled={!canEdit}
                   checked={item.done}
                   onChange={(e) => {
                     const updated = checklist.map((i, iIdx) => (iIdx === idx ? { ...i, done: e.target.checked } : i));
                     setChecklist(updated);
-                    onEditDetail(cardId, { checklist: JSON.stringify(updated) });
+                    saveDetail(cardId, { checklist: JSON.stringify(updated) });
                   }}
                   className="w-4 h-4 rounded text-blue-600 accent-blue-600 cursor-pointer"
                 />
@@ -741,10 +772,11 @@ function CardDetailModal({
                 </span>
                 {canEdit && (
                   <button
+                    aria-label={`Remove checklist item: ${item.text}`}
                     onClick={() => {
                       const updated = checklist.filter((_, iIdx) => iIdx !== idx);
                       setChecklist(updated);
-                      onEditDetail(cardId, { checklist: JSON.stringify(updated) });
+                      saveDetail(cardId, { checklist: JSON.stringify(updated) });
                     }}
                     className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 cursor-pointer"
                   >
@@ -758,7 +790,7 @@ function CardDetailModal({
               <div className="flex items-center gap-2 mt-1">
                 <input
                   type="text"
-                  placeholder="Add a checklist item..."
+                  aria-label="New checklist item" placeholder="Add a checklist item..."
                   value={newItemText}
                   onChange={(e) => setNewItemText(e.target.value)}
                   onKeyDown={(e) => {
@@ -767,7 +799,7 @@ function CardDetailModal({
                       const updated = [...checklist, { id: Date.now().toString(), text: newItemText.trim(), done: false }];
                       setChecklist(updated);
                       setNewItemText("");
-                      onEditDetail(cardId, { checklist: JSON.stringify(updated) });
+                      saveDetail(cardId, { checklist: JSON.stringify(updated) });
                     }
                   }}
                   className={`flex-1 px-3 py-1.5 rounded-xl border text-xs focus:outline-none ${
@@ -780,7 +812,7 @@ function CardDetailModal({
                       const updated = [...checklist, { id: Date.now().toString(), text: newItemText.trim(), done: false }];
                       setChecklist(updated);
                       setNewItemText("");
-                      onEditDetail(cardId, { checklist: JSON.stringify(updated) });
+                      saveDetail(cardId, { checklist: JSON.stringify(updated) });
                     }
                   }}
                   className="px-3 py-1.5 bg-[#4262ff] hover:bg-[#3551d8] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
@@ -834,6 +866,9 @@ export default function Board() {
     viewInviteToken,
     status,
     errorToast,
+    boardError, retryBoard,
+    onlineUsers,
+    operations, pendingDeletes, undoDelete, retryOperation, refreshBoard, dismissOperation,
     moveCard,
     addCard,
     editCard,
@@ -916,6 +951,9 @@ export default function Board() {
   const navigate = useNavigate();
   const [showGuestShareModal, setShowGuestShareModal] = useState(false);
   const [showGuestExitModal, setShowGuestExitModal] = useState(false);
+  const [guestLogoutRequested, setGuestLogoutRequested] = useState(false);
+  const [guestExitError, setGuestExitError] = useState("");
+  const [isDiscardingGuestBoard, setIsDiscardingGuestBoard] = useState(false);
   const [isEditingBoardName, setIsEditingBoardName] = useState(false);
   const [tempBoardName, setTempBoardName] = useState("");
   const [collapsedSwimlanes, setCollapsedSwimlanes] = useState<Record<string, boolean>>({});
@@ -1079,6 +1117,25 @@ export default function Board() {
     setModalInputVal("");
   };
 
+  const confirmationRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!modalConfig.isOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const dialog = confirmationRef.current;
+    dialog?.querySelector<HTMLElement>('input, [data-cancel]')?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeModal(); }
+      if (event.key === "Tab") {
+        const elements = Array.from(dialog?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)') || []);
+        const first = elements[0], last = elements[elements.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    };
+    dialog?.addEventListener("keydown", handleKey);
+    return () => { dialog?.removeEventListener("keydown", handleKey); if (previous?.isConnected) previous.focus(); };
+  }, [modalConfig.isOpen]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -1176,7 +1233,21 @@ export default function Board() {
 
 
 
+  const handleWorkspaceLogout = () => {
+    if (user?.email === "guest@kanban.demo" && boardId && isOwner) {
+      setGuestLogoutRequested(true);
+      setGuestExitError("");
+      setShowGuestExitModal(true);
+      return;
+    }
+    if (user?.email === "guest@kanban.demo" && !window.confirm("Log out of your guest session? You may lose access to your guest boards.")) return;
+    isLoggingInRef.current = true;
+    logout();
+  };
+
   if (!boardId) return null;
+  if (boardError) return <main className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-6"><section className="max-w-md text-center space-y-4 dark:text-white"><h1 className="text-2xl font-bold">{boardError === "missing" ? "Board not found" : "You don’t have access to this board"}</h1><p>{boardError === "missing" ? "This board may have been deleted or the link is incorrect." : "Sign in with an account that has access, or ask the owner for an invitation."}</p><div className="flex justify-center gap-4"><button className="new-task-button" onClick={() => navigate("/")}>Back to dashboard</button><button onClick={retryBoard}>Try again</button>{boardError === "forbidden" && <button onClick={() => handleLogin(boardId)}>Sign in</button>}</div></section></main>;
+
 
   const bgPresetClass = BOARD_BACKGROUND_PRESETS[boardBackground]?.class || "";
 
@@ -1185,21 +1256,19 @@ export default function Board() {
       bgPresetClass || (theme === "dark" ? "bg-[#090d16] text-[#f8fafc]" : "bg-[#f8fafc] text-slate-900")
     }`}>
 
-      <aside className="workspace-sidebar" aria-label="Workspace navigation">
-        <button className="workspace-logo" onClick={() => document.getElementById("board-overview")?.scrollIntoView({ block: "start" })}><span><Layers3 size={23} /></span>kanban<span className="workspace-logo-dot">.</span></button>
-        <div className="workspace-switcher"><span className="workspace-avatar">{user?.name?.[0] || "K"}</span><div><strong>My workspace</strong><small>{user?.email === "guest@kanban.demo" ? "Guest session" : "Personal workspace"}</small></div></div>
-        <div className="sidebar-section-label">WORKSPACE</div>
-        <button className="sidebar-nav" onClick={() => { if ((!user || user.email === "guest@kanban.demo") && isOwner) setShowGuestExitModal(true); else navigate("/"); }}><LayoutDashboard size={17} /> All boards <ArrowUpRight size={14} /></button>
-        <button className="sidebar-nav active" onClick={() => document.getElementById("board-content")?.scrollIntoView({ block: "start" })} aria-current="page"><Layers3 size={17} /> Current board <span>{cards.length}</span></button>
-        <div className="sidebar-section-label">WORKSTREAMS</div>
+      <div className="mutation-feedback" aria-label="Task save status">
+        {pendingDeletes.map(id => <div key={id} className="mutation-notice"><span role="status">TSK-{id}: deletion queued (6 seconds). Leaving this board cancels it.</span><button onClick={() => undoDelete(id)}>Undo</button></div>)}
+        {operations.map(op => <div key={op.id} className={`mutation-notice mutation-${op.state}`}><span role={op.state === "error" || op.state === "unknown" ? "alert" : "status"}>{op.label}: {op.state === "saving" ? "Saving…" : op.state === "saved" ? "Saved" : op.message}</span>{op.state === "error" && <button disabled={status !== "connected"} onClick={() => retryOperation(op.id)}>Retry</button>}{op.state === "unknown" && <button onClick={refreshBoard}>Refresh board</button>}{op.state !== "saving" && <button aria-label={`Dismiss ${op.label} status`} onClick={() => dismissOperation(op.id)}><X size={14} /></button>}</div>)}
+      </div>
+      <WorkspaceSidebar onLogout={handleWorkspaceLogout} user={user} activePage="board" cardCount={cards.length}
+        role={isOwner ? "Workspace owner" : canEdit ? "Editor" : "Viewer"}
+        onOverview={() => document.getElementById("board-overview")?.scrollIntoView({ block: "start" })}
+        onAllBoards={() => navigate("/")}>
+        <div className="sidebar-section-label">SWIMLANES</div>
         {(swimlanes.length ? swimlanes : ["All tasks"]).map((name, index) => (
           <button key={name} onClick={() => document.getElementById(`workstream-${index}`)?.scrollIntoView({ block: "start" })} className="sidebar-stream"><i style={{ background: ["#8b7cf8", "#efa86c", "#5eb8a4"][index % 3] }} />{name}</button>
         ))}
-        <div className="sidebar-bottom">
-          <div className="workspace-note"><Sparkles size={18} /><strong>Better work, together.</strong><p>Open this board in another tab to see updates as they happen.</p></div>
-          <div className="sidebar-profile"><span className="workspace-avatar">{user?.name?.[0] || "V"}</span><div><strong>{user?.name || "Visitor"}</strong><small>{isOwner ? "Workspace owner" : canEdit ? "Editor" : "Viewer"}</small></div></div>
-        </div>
-      </aside>
+      </WorkspaceSidebar>
       {status !== "connected" && (
         <div role="status" className="bg-amber-100 text-amber-950 px-4 py-3 text-center text-sm">
           {status === "connecting" ? "Connecting and refreshing your board…" : "Connection lost. Reconnecting…"}
@@ -1221,28 +1290,12 @@ export default function Board() {
         {/* Header Left: Brand Logo & Board Title */}
         <div className="board-brand flex items-center gap-3">
           <button
-            onClick={() => {
-              if ((!user || user.email === "guest@kanban.demo") && isOwner) {
-                setShowGuestExitModal(true);
-              } else {
-                navigate("/");
-              }
-            }}
+            onClick={() => navigate("/")}
             className="flex items-center gap-2 group cursor-pointer select-none"
             aria-label="Go to dashboard"
             title="Go to Dashboard"
           >
-            {/* Sleek Gradient Glowing Logo Badge */}
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#2563eb] via-[#4f46e5] to-[#38bdf8] p-[1.5px] shadow-sm shadow-blue-500/20 group-hover:shadow-blue-500/40 group-hover:scale-105 transition-all duration-200">
-              <div className="w-full h-full bg-[#0f172a] rounded-[10.5px] flex items-center justify-center p-1 gap-0.5">
-                <div className="w-1 h-full rounded-xs bg-gradient-to-b from-blue-400 to-blue-600 shadow-2xs" />
-                <div className="w-1 h-3/4 rounded-xs bg-gradient-to-b from-sky-300 to-indigo-500 shadow-2xs" />
-                <div className="w-1 h-1/2 rounded-xs bg-gradient-to-b from-indigo-400 to-purple-500 shadow-2xs" />
-              </div>
-            </div>
-            <span className="font-extrabold text-sm tracking-tight text-slate-800 dark:text-slate-100 group-hover:text-blue-500 transition-colors">
-              Kanban
-            </span>
+            <span className="mobile-workspace-symbol"><Layers3 size={22} /></span>
           </button>
 
           <div className={`h-4 w-px ${theme === "dark" ? "bg-[#1e293b]" : "bg-gray-200"}`} />
@@ -1289,6 +1342,11 @@ export default function Board() {
 
         {/* Header Right Status & User */}
         <div className="board-top-actions flex items-center gap-3">
+          {status === "connected" && onlineUsers.length > 0 && <div className="board-presence" aria-label={`${onlineUsers.length} users on this board`}>
+            <div className="presence-avatars">{onlineUsers.slice(0, 4).map(person => <span key={person.id} tabIndex={0} aria-label={`${person.name || "Visitor"}${String(person.id) === String(user?.id) ? " (you)" : ""} — online`} title={`${person.name || "Visitor"}${String(person.id) === String(user?.id) ? " (you)" : ""}`}><AvatarImage src={person.avatarUrl} name={person.name || "Visitor"} className="presence-avatar" /><i aria-hidden="true" /></span>)}{onlineUsers.length > 4 && <span className="presence-overflow" title={onlineUsers.slice(4).map(p => p.name).join(", ")}>+{onlineUsers.length - 4}</span>}</div>
+            <span className="presence-count">{onlineUsers.length} online</span>
+          </div>}
+
           <button
             onClick={toggleTheme}
             className={`p-1.5 rounded-xl border transition-colors cursor-pointer ${theme === "dark"
@@ -1300,7 +1358,7 @@ export default function Board() {
             {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
-          <div className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 border transition-all ${status === "connected"
+          <div role="status" className={`workspace-connection px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 border transition-all ${status === "connected"
             ? theme === "dark" ? "bg-emerald-950/60 border-emerald-800/80 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-700"
             : status === "connecting"
               ? "bg-amber-50 border-amber-200 text-amber-700 animate-pulse"
@@ -1370,7 +1428,7 @@ export default function Board() {
                   ? "bg-[#1e293b] text-slate-200 hover:bg-[#334155] border-[#334155]"
                   : "bg-gray-100 text-slate-700 hover:bg-gray-200 border-gray-200"
                   }`}
-                title="Notifications"
+                aria-label="Notifications" title="Notifications"
               >
                 <Bell size={16} />
                 {unreadCount > 0 && (
@@ -1472,39 +1530,25 @@ export default function Board() {
                 setIsShareModalOpen(true);
               }
             }}
-            className={`px-4 py-1.5 rounded-xl text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${theme === "dark" ? "bg-[#2563eb] hover:bg-[#1d4ed8] shadow-md shadow-blue-500/20" : "bg-[#4262ff] hover:bg-[#3551d8] shadow-md shadow-blue-500/20"
+            className={`workspace-share px-4 py-1.5 rounded-xl text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${theme === "dark" ? "bg-[#2563eb] hover:bg-[#1d4ed8] shadow-md shadow-blue-500/20" : "bg-[#4262ff] hover:bg-[#3551d8] shadow-md shadow-blue-500/20"
               }`}
           >
             <LinkIcon size={13} /> Share
           </button>
 
           {user ? (
-            <div className={`flex items-center gap-2.5 px-3 py-1 rounded-xl border ${theme === "dark" ? "bg-[#1e293b] border-[#334155]" : "bg-gray-50 border-gray-200"
+            <div className={`workspace-mobile-account flex items-center gap-2.5 px-3 py-1 rounded-xl border ${theme === "dark" ? "bg-[#1e293b] border-[#334155]" : "bg-gray-50 border-gray-200"
               }`}>
-              <AvatarImage 
-                src={user.avatarUrl} 
-                name={user.name} 
-                className="w-6 h-6 rounded-full object-cover" 
+              <AvatarImage
+                src={user.avatarUrl}
+                name={user.name}
+                className="w-6 h-6 rounded-full object-cover"
               />
               <span className={`text-xs font-semibold ${theme === "dark" ? "text-slate-200" : "text-slate-700"}`}>{user.name}</span>
               <button
-                onClick={async () => {
-                  if (user?.email === "guest@kanban.demo" && boardId && isOwner) {
-                    const token = (sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"));
-                    if (token) {
-                      try {
-                        await fetch(`${API_URL}/api/boards/${boardId}`, {
-                          method: "DELETE",
-                          headers: { Authorization: `Bearer ${token}` },
-                        });
-                      } catch (e) {}
-                    }
-                  }
-                  logout();
-                  navigate("/");
-                }}
+                onClick={handleWorkspaceLogout}
                 className="text-slate-400 hover:text-rose-600 transition-colors ml-1 cursor-pointer"
-                title="Logout"
+                aria-label="Logout" title="Logout"
               >
                 <LogOut size={13} />
               </button>
@@ -1520,12 +1564,13 @@ export default function Board() {
         </div>
       </header>
 
+      {user?.email === "guest@kanban.demo" && isOwner && <div className="guest-session-notice" role="note"><span><strong>Guest session</strong> · Logging out of this board deletes it. Sign in to keep it.</span><button onClick={() => handleLogin(boardId || "")}>Sign in to save</button></div>}
       <section id="board-overview" className="board-overview" aria-label="Board overview">
         <div className="overview-copy">
-          <div className="board-eyebrow"><span /> YOUR SPACE TO MAKE THINGS HAPPEN</div>
+
           <h2>{boardName}</h2>
-          <p>Big ideas, small steps. Keep everything moving in one place.</p>
-          <div className="overview-meta"><span><Layers3 size={14} /> {columns.length} stages</span><span><UserPlus size={14} /> {swimlanes.length || 1} workstreams</span><span className="overview-access">{isOwner ? "Owner" : canEdit ? "Editor" : "View only"}</span></div>
+
+          <div className="overview-meta"><span><Layers3 size={14} /> {columns.length} columns</span><span><UserPlus size={14} /> {swimlanes.length || 1} swimlanes</span><span className="overview-access">{isOwner ? "Owner" : canEdit ? "Editor" : "View only"}</span></div>
         </div>
         <div className="overview-action">
           {canEdit && columns.length > 0 && <button className="new-task-button" disabled={status !== "connected"} onClick={() => {
@@ -1537,7 +1582,7 @@ export default function Board() {
           <div className="overview-task-count"><strong>{cards.length}</strong><span>tasks on this board</span></div>
         </div>
       </section>
-      <div className="board-view-tabs"><span><LayoutDashboard size={15} /> Board <span>{cards.length}</span></span><p>One shared view. Every next step.</p></div>
+      <div className="board-view-tabs"><span><LayoutDashboard size={15} /> Board <span>{cards.length}</span></span><p>Columns show progress · Swimlanes group related tasks</p></div>
 
       {/* Secondary Toolbar: Search, Filter Chips & Export PNG/PDF */}
       <div className={`board-toolbar px-6 py-2.5 border-b flex flex-wrap items-center justify-between gap-3 ${
@@ -1551,7 +1596,7 @@ export default function Board() {
             <Search size={14} className="text-slate-400 flex-shrink-0" />
             <input
               type="text"
-              aria-label="Search cards"
+              aria-label="Search tasks"
               placeholder="Search tasks…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -1576,7 +1621,7 @@ export default function Board() {
                   : theme === "dark" ? "bg-[#1e293b] text-slate-300 border-[#334155] hover:bg-slate-800" : "bg-white text-slate-600 border-gray-200 hover:bg-gray-100"
               }`}
             >
-              All Cards
+              All tasks
             </button>
             {allBoardTags.map((tagName) => {
               const colorObj = getTagColor(tagName);
@@ -1701,7 +1746,7 @@ export default function Board() {
       {filteredCards.length === 0 && cards.length > 0 && (
         <div className="board-no-results" role="status">No matching tasks. Try another search or clear your filters.</div>
       )}
-      <div className="board-scroll" role="region" aria-label="Task board, scroll horizontally to see more stages" tabIndex={0}>
+      <div className="board-scroll" role="region" aria-label="Task board, scroll horizontally to see more columns" tabIndex={0}>
       <main id="board-content" ref={boardContainerRef} className="board-canvas p-6 md:p-8 w-full max-w-[1920px] mx-auto relative z-10 flex flex-col gap-6" style={{ minWidth: Math.max(columns.length * 290 + 64, 354) }}>
 
         {/* Unauthenticated Edit Prompt Banner (Shown ONLY if logging in will grant edit access) */}
@@ -1714,7 +1759,7 @@ export default function Board() {
               </div>
               <div>
                 <p className="text-xs font-bold">Want to edit this board?</p>
-                <p className="text-[11px] opacity-75">Log in with Google to create, edit, and move cards in real-time.</p>
+                <p className="text-[11px] opacity-75">Log in with Google to create, edit, and move tasks in real-time.</p>
               </div>
             </div>
             <button
@@ -1761,14 +1806,14 @@ export default function Board() {
                       <button
                         onClick={() => openRenameModal("Rename Column", col, (newName) => renameColumn(col, newName))}
                         className="p-1 text-slate-400 hover:text-blue-500 rounded transition-colors"
-                        title="Rename Column"
+                        aria-label="Rename Column" title="Rename Column"
                       >
                         <Edit2 size={12} />
                       </button>
                       <button
-                        onClick={() => openConfirmModal("Delete Column?", `Are you sure you want to delete column "${col}" and all its cards?`, () => deleteColumn(col))}
+                        onClick={() => openConfirmModal("Delete Column?", `Are you sure you want to delete column "${col}" and all its tasks?`, () => deleteColumn(col))}
                         className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors"
-                        title="Delete Column"
+                        aria-label="Delete Column" title="Delete Column"
                       >
                         <Trash2 size={12} />
                       </button>
@@ -1799,7 +1844,7 @@ export default function Board() {
                   {/* Swimlane Section Title Row with Collapsible Chevron */}
                   {swimlanes.length > 0 && (
                     <div className="workstream-heading flex items-center gap-2.5 py-1 group/swim">
-                      <button 
+                      <button
                         className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors p-0.5 cursor-pointer"
                         onClick={() => toggleSwimlane(swim)}
                         title={isCollapsed ? "Expand Swimlane" : "Collapse Swimlane"}
@@ -1807,7 +1852,7 @@ export default function Board() {
                         {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                       </button>
 
-                      <span 
+                      <span
                         onClick={() => {
                           if (canEdit) openRenameModal("Rename Swimlane", swim, (newName) => renameSwimlane(swim, newName));
                         }}
@@ -1826,14 +1871,14 @@ export default function Board() {
                           <button
                             onClick={() => openRenameModal("Rename Swimlane", swim, (newName) => renameSwimlane(swim, newName))}
                             className={`p-1 text-slate-400 hover:text-blue-500 rounded transition-colors cursor-pointer ${theme === "dark" ? "hover:bg-slate-800" : "hover:bg-gray-100"}`}
-                            title="Rename Swimlane"
+                            aria-label="Rename Swimlane" title="Rename Swimlane"
                           >
                             <Edit2 size={13} />
                           </button>
                           <button
                             onClick={() => openConfirmModal("Delete Swimlane?", `Are you sure you want to delete swimlane "${swim}"?`, () => deleteSwimlane(swim))}
                             className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-500/10 transition-colors cursor-pointer"
-                            title="Delete Swimlane"
+                            aria-label="Delete Swimlane" title="Delete Swimlane"
                           >
                             <Trash2 size={13} />
                           </button>
@@ -1876,7 +1921,7 @@ export default function Board() {
                                       columnIndex={colIdx}
                                       swimlaneName={swimlanes.length > 0 ? ((c.Swimlane && c.Swimlane !== "Untitled") ? c.Swimlane : (swim || "Untitled")) : undefined}
                                       swimlaneIndex={swimIdx}
-                                      onEdit={editCard}
+                                      onEdit={(id, title, expectedTitle) => editCard(id, title, undefined, expectedTitle)}
                                       onUpdateTags={updateCardTags}
                                       onDelete={(cardId) => openConfirmModal("Delete Task?", `Are you sure you want to delete task "${c.Title}"?`, () => deleteCard(cardId))}
                                       onOpenDetail={handleOpenCardDetail}
@@ -1887,7 +1932,7 @@ export default function Board() {
                               </SortableContext>
                             </div>
 
-                            {/* Full-width "+ Add card" button (Only visible on hover matching user mockups) */}
+                            {/* Full-width "+ Add task" button (Only visible on hover matching user mockups) */}
                             {canEdit && !isAdding && (
                               <button
                                 onClick={() => {
@@ -1900,7 +1945,7 @@ export default function Board() {
                                     : "bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200/80 shadow-2xs"
                                 }`}
                               >
-                                <Plus size={14} /> Add card
+                                <Plus size={14} /> Add task
                               </button>
                             )}
 
@@ -2004,7 +2049,7 @@ export default function Board() {
               <line x1="12" y1="12" x2="12" y2="20" />
               <line x1="8" y1="16" x2="16" y2="16" />
             </svg>
-            <span>Add workstream</span>
+            <span>Add swimlane</span>
           </button>
 
           <div className={`h-5 w-[1px] ${theme === "dark" ? "bg-[#1e293b]" : "bg-gray-200"}`} />
@@ -2028,7 +2073,7 @@ export default function Board() {
               <line x1="12" y1="12" x2="20" y2="12" />
               <line x1="16" y1="8" x2="16" y2="16" />
             </svg>
-            <span>Add stage</span>
+            <span>Add column</span>
           </button>
         </div>
       )}
@@ -2036,7 +2081,7 @@ export default function Board() {
       {/* Custom Light Glassmorphic Modal Card Box (Centered on screen) */}
       {modalConfig.isOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-4">
-          <div className={`rounded-2xl shadow-2xl p-6 w-full max-w-sm flex flex-col gap-4 relative border animate-in fade-in zoom-in-95 duration-150 ${theme === "dark" ? "bg-[#0f172a] border-[#1e293b] text-slate-100" : "bg-white border-gray-200 text-slate-900"
+          <div ref={confirmationRef} role="dialog" aria-modal="true" aria-label={modalConfig.title} className={`rounded-2xl shadow-2xl p-6 w-full max-w-sm flex flex-col gap-4 relative border animate-in fade-in zoom-in-95 duration-150 ${theme === "dark" ? "bg-[#0f172a] border-[#1e293b] text-slate-100" : "bg-white border-gray-200 text-slate-900"
             }`}>
 
             {/* Modal Header */}
@@ -2050,7 +2095,7 @@ export default function Board() {
                 {modalConfig.title}
               </h3>
               <button
-                onClick={closeModal}
+                aria-label="Close confirmation" onClick={closeModal}
                 className={`transition-colors p-1 rounded-lg ${theme === "dark" ? "text-slate-400 hover:text-white hover:bg-slate-800" : "text-slate-400 hover:text-slate-700 hover:bg-gray-100"}`}
               >
                 <X size={15} />
@@ -2066,7 +2111,7 @@ export default function Board() {
               <div className="flex flex-col gap-1.5">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Name</label>
                 <input
-                  autoFocus
+                  aria-label="Name" autoFocus
                   type="text"
                   value={modalInputVal}
                   onChange={(e) => setModalInputVal(e.target.value)}
@@ -2085,7 +2130,7 @@ export default function Board() {
             {/* Modal Action Buttons */}
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
-                onClick={closeModal}
+                data-cancel onClick={closeModal}
                 className="px-3.5 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-slate-700 text-xs font-semibold transition-colors"
               >
                 Cancel
@@ -2335,7 +2380,7 @@ export default function Board() {
                                       // ถ้ายิง API ไม่ผ่าน ค่อยดึงข้อมูลเดิมจากเซิร์ฟเวอร์มาคืนค่า
                                       fetchBoardMembers();
                                     }
-                                    // **ถ้ายิงผ่าน (res.ok) ไม่ต้องเรียก fetchBoardMembers() แล้ว** 
+                                    // **ถ้ายิงผ่าน (res.ok) ไม่ต้องเรียก fetchBoardMembers() แล้ว**
                                     // เพราะ Optimistic Update ได้อัปเดต state อย่างถูกต้องเรียบร้อยแล้ว
                                   } catch (err) {
                                     console.error("Error updating role:", err);
@@ -2467,6 +2512,8 @@ export default function Board() {
           card={currentCardDetail}
           canEdit={canEdit}
           theme={theme}
+          columns={columns}
+          onMove={(id, column) => moveCard(id, column, Math.max(0, ...cards.filter(c => c.List === column).map(c => c.Position || 0)) + 1000)}
           swimlanes={swimlanes}
           onClose={() => setSelectedCardDetail(null)}
           onEditDetail={editCardDetail}
@@ -2481,10 +2528,10 @@ export default function Board() {
 
       {/* Guest Share Prompt Modal */}
       {showGuestShareModal && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+        <div role="dialog" aria-modal="true" aria-label="Keep or delete guest board" className="fixed inset-0 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className={`max-w-md w-full rounded-3xl p-6 border shadow-2xl relative overflow-hidden ${
-            theme === "dark" 
-              ? "bg-[#1e293b]/95 border-[#334155] text-slate-100 shadow-blue-950/40" 
+            theme === "dark"
+              ? "bg-[#1e293b]/95 border-[#334155] text-slate-100 shadow-blue-950/40"
               : "bg-white/95 border-gray-200 text-slate-900 shadow-slate-400/20"
           }`}>
             <div className="absolute -top-16 -right-16 w-36 h-36 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
@@ -2495,7 +2542,7 @@ export default function Board() {
                   <UserPlus size={20} />
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setShowGuestShareModal(false)}
                 className="p-1 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
@@ -2530,10 +2577,10 @@ export default function Board() {
 
       {/* Guest Exit & Save Prompt Modal */}
       {showGuestExitModal && (
-        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+        <div role="dialog" aria-modal="true" aria-label="Keep or delete guest board" className="fixed inset-0 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className={`max-w-md w-full rounded-3xl p-6 border shadow-2xl relative overflow-hidden ${
-            theme === "dark" 
-              ? "bg-[#1e293b]/95 border-[#334155] text-slate-100 shadow-rose-950/30" 
+            theme === "dark"
+              ? "bg-[#1e293b]/95 border-[#334155] text-slate-100 shadow-rose-950/30"
               : "bg-white/95 border-gray-200 text-slate-900 shadow-slate-400/20"
           }`}>
             <div className="absolute -top-16 -right-16 w-36 h-36 bg-amber-500/20 rounded-full blur-2xl pointer-events-none" />
@@ -2544,8 +2591,9 @@ export default function Board() {
                   <AlertCircle size={20} />
                 </div>
               </div>
-              <button 
-                onClick={() => setShowGuestExitModal(false)}
+              <button
+                disabled={isDiscardingGuestBoard}
+                onClick={() => { setShowGuestExitModal(false); setGuestLogoutRequested(false); }}
                 className="p-1 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X size={18} />
@@ -2553,41 +2601,49 @@ export default function Board() {
             </div>
 
             <h3 className="text-lg font-extrabold tracking-tight mb-2">
-              Save Board Before Leaving?
+              Keep this board before leaving?
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
-              You are using <strong className="text-amber-500 font-semibold">Guest Access</strong>. Connect your Google account now to save this board permanently under your dashboard, or exit to discard.
+              This board belongs to your <strong>Guest session</strong>. Sign in to keep it. Choosing “Delete board & leave” permanently deletes this board and all its tasks.
             </p>
 
+            {guestExitError && <p role="alert" className="text-sm text-rose-500 mb-3">{guestExitError}</p>}
             <div className="flex flex-col gap-2.5">
               <button
+                disabled={isDiscardingGuestBoard}
                 onClick={() => handleLogin(boardId || "")}
                 className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Check size={15} /> Sign In to Save Board
               </button>
               <button
+                disabled={isDiscardingGuestBoard}
                 onClick={async () => {
-                  setShowGuestExitModal(false);
-                  const token = (sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt"));
-                  if (boardId && token) {
-                    try {
-                      await fetch(`${API_URL}/api/boards/${boardId}`, {
-                        method: "DELETE",
-                        headers: { Authorization: `Bearer ${token}` },
-                      });
-                    } catch (err) {
-                      console.error("Failed deleting guest board:", err);
-                    }
-                  }
-                  navigate("/", { replace: true });
+                  setIsDiscardingGuestBoard(true);
+                  setGuestExitError("");
+                  try {
+                    const token = sessionStorage.getItem("kanban_jwt") || localStorage.getItem("kanban_jwt");
+                    if (!token || !boardId) throw new Error("Missing session");
+                    const response = await fetch(`${API_URL}/api/boards/${boardId}`, {
+                      method: "DELETE", headers: { Authorization: `Bearer ${token}` },
+                    });
+                    if (!response.ok && response.status !== 404) throw new Error("Delete failed");
+                    setShowGuestExitModal(false);
+                    if (guestLogoutRequested) {
+                      isLoggingInRef.current = true;
+                      logout();
+                    } else navigate("/", { replace: true });
+                  } catch {
+                    setGuestExitError("Could not delete the board. You are still signed in. Please try again.");
+                  } finally { setIsDiscardingGuestBoard(false); }
                 }}
                 className="w-full py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold rounded-xl border border-rose-500/30 transition-all cursor-pointer flex items-center justify-center gap-1.5"
               >
-                <Trash2 size={13} /> Exit & Discard Board
+                <Trash2 size={13} /> {isDiscardingGuestBoard ? "Deleting…" : "Delete board & leave"}
               </button>
               <button
-                onClick={() => setShowGuestExitModal(false)}
+                disabled={isDiscardingGuestBoard}
+                onClick={() => { setShowGuestExitModal(false); setGuestLogoutRequested(false); }}
                 className="w-full py-1.5 bg-transparent hover:bg-gray-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 text-xs font-medium rounded-xl transition-all cursor-pointer"
               >
                 Stay on Board

@@ -32,6 +32,7 @@ var upgrader = websocket.Upgrader{
 }
 
 type Client struct {
+	requestID   string
 	hub         *Hub
 	conn        *websocket.Conn
 	send        chan []byte
@@ -45,38 +46,45 @@ type Client struct {
 }
 
 type WsMessage struct {
-	Type        string  `json:"type"`
-	CardId      string  `json:"cardId,omitempty"`
-	BoardId     string  `json:"boardId,omitempty"`
-	Title       string  `json:"title,omitempty"`
-	ToList      string  `json:"toList,omitempty"`
-	Swimlane    string  `json:"swimlane,omitempty"`
-	Position    float64 `json:"position,omitempty"`
-	Card        *Card   `json:"card,omitempty"`
-	Cards       []Card  `json:"cards,omitempty"`
-	ColumnName  string  `json:"columnName,omitempty"`
-	OldColumn   string  `json:"oldColumn,omitempty"`
-	Columns     string  `json:"columns,omitempty"`
-	Swimlanes   string  `json:"swimlanes,omitempty"`
-	OldSwimlane string  `json:"oldSwimlane,omitempty"`
-	BoardName   string  `json:"boardName,omitempty"`
-	AccessLevel string  `json:"accessLevel,omitempty"`
-	InviteToken string  `json:"inviteToken,omitempty"`
-	Tags        string  `json:"tags,omitempty"`
-	Description string  `json:"description,omitempty"`
-	DueDate     string  `json:"dueDate,omitempty"`
-	Checklist   string  `json:"checklist,omitempty"`
-	Background  string  `json:"background,omitempty"`
+	Changes     map[string]string `json:"changes,omitempty"`
+	Expected    map[string]string `json:"expected,omitempty"`
+	RequestID   string            `json:"requestId,omitempty"`
+	Type        string            `json:"type"`
+	CardId      string            `json:"cardId,omitempty"`
+	BoardId     string            `json:"boardId,omitempty"`
+	Title       string            `json:"title,omitempty"`
+	ToList      string            `json:"toList,omitempty"`
+	Swimlane    string            `json:"swimlane,omitempty"`
+	Position    float64           `json:"position,omitempty"`
+	Card        *Card             `json:"card,omitempty"`
+	Cards       []Card            `json:"cards,omitempty"`
+	ColumnName  string            `json:"columnName,omitempty"`
+	OldColumn   string            `json:"oldColumn,omitempty"`
+	Columns     string            `json:"columns,omitempty"`
+	Swimlanes   string            `json:"swimlanes,omitempty"`
+	OldSwimlane string            `json:"oldSwimlane,omitempty"`
+	BoardName   string            `json:"boardName,omitempty"`
+	AccessLevel string            `json:"accessLevel,omitempty"`
+	InviteToken string            `json:"inviteToken,omitempty"`
+	Tags        string            `json:"tags,omitempty"`
+	Description string            `json:"description,omitempty"`
+	DueDate     string            `json:"dueDate,omitempty"`
+	Checklist   string            `json:"checklist,omitempty"`
+	Background  string            `json:"background,omitempty"`
 }
 
 // sendError is a small helper that pushes an ERROR frame back to this client.
 func (c *Client) sendError(text string) {
 	errMsg, _ := json.Marshal(WsMessage{
-		Type:    "ERROR",
-		Title:   text,
-		BoardId: c.boardID,
+		Type:      "ERROR",
+		RequestID: c.requestID,
+		Title:     text,
+		BoardId:   c.boardID,
 	})
-	_ = c.conn.WriteMessage(websocket.TextMessage, errMsg)
+	select {
+	case c.send <- errMsg:
+	default:
+	}
 }
 
 // validateCardMutation validates the fields of a client mutation against the
@@ -112,6 +120,26 @@ func validateCardMutation(msg WsMessage) (WsMessage, string) {
 	case "EDIT_CARD":
 		if msg.CardId == "" {
 			return msg, "Missing cardId."
+		}
+		if msg.Changes != nil {
+			if len(msg.Changes) == 0 {
+				return msg, "No task changes supplied."
+			}
+			for key, value := range msg.Changes {
+				switch key {
+				case "title", "description", "dueDate", "checklist", "tags", "swimlane":
+				default:
+					return msg, "Invalid task field."
+				}
+				if key == "title" {
+					value = trimTitle(value)
+					if value == "" {
+						return msg, "Card title cannot be empty."
+					}
+					msg.Changes[key] = value
+				}
+			}
+			return msg, ""
 		}
 		if msg.Title != "" {
 			msg.Title = trimTitle(msg.Title)
@@ -201,6 +229,9 @@ func (c *Client) readPump() {
 			break
 		}
 
+		var request WsMessage
+		_ = json.Unmarshal(message, &request)
+		c.requestID = request.RequestID
 		now := time.Now()
 		if now.Sub(c.lastMsgTime) > time.Second {
 			c.lastMsgTime = now
@@ -294,6 +325,8 @@ func (c *Client) readPump() {
 						log.Println("renormalize failed:", err)
 					} else {
 						c.broadcastReorder(msg.ToList, cards)
+						ack, _ := json.Marshal(WsMessage{Type: "ACK", RequestID: msg.RequestID, BoardId: c.boardID})
+						c.send <- ack
 						continue
 					}
 				}
@@ -303,27 +336,45 @@ func (c *Client) readPump() {
 					swim = "Untitled"
 				}
 				newCard := Card{Title: msg.Title, List: msg.ToList, Swimlane: swim, BoardID: c.boardID, Position: msg.Position, Tags: msg.Tags}
-				c.db.Create(&newCard)
+				if err := c.db.Create(&newCard).Error; err != nil {
+					c.sendError("Could not create task. Please try again.")
+					continue
+				}
 				msg.Card = &newCard
 			case "EDIT_CARD":
 				updates := map[string]interface{}{}
-				if msg.Title != "" {
-					updates["title"] = msg.Title
+				query := c.db.Model(&Card{}).Where("id = ? AND board_id = ?", msg.CardId, c.boardID)
+				if msg.Changes != nil {
+					fields := map[string]string{"title": "title", "description": "description", "dueDate": "due_date", "checklist": "checklist", "tags": "tags", "swimlane": "swimlane"}
+					for key, value := range msg.Changes {
+						column := fields[key]
+						updates[column] = value
+						if previous, ok := msg.Expected[key]; ok {
+							query = query.Where("COALESCE("+column+", '') = ?", previous)
+						}
+					}
+				} else {
+					// Legacy clients update only supplied nonempty fields.
+					for column, value := range map[string]string{"title": msg.Title, "description": msg.Description, "due_date": msg.DueDate, "checklist": msg.Checklist, "tags": msg.Tags, "swimlane": msg.Swimlane} {
+						if value != "" {
+							updates[column] = value
+						}
+					}
 				}
-				if msg.Swimlane != "" {
-					updates["swimlane"] = msg.Swimlane
+				if result := query.Updates(updates); result.Error != nil || result.RowsAffected == 0 {
+					c.sendError("Task changed or was deleted by another user. Refresh and review before editing again.")
+					continue
 				}
-				if msg.Tags != "" {
-					updates["tags"] = msg.Tags
-				}
-				updates["description"] = msg.Description
-				updates["due_date"] = msg.DueDate
-				updates["checklist"] = msg.Checklist
-				c.db.Model(&Card{}).Where("id = ? AND board_id = ?", msg.CardId, c.boardID).Updates(updates)
 			case "UPDATE_CARD_TAGS":
-				c.db.Model(&Card{}).Where("id = ? AND board_id = ?", msg.CardId, c.boardID).Update("tags", msg.Tags)
+				if result := c.db.Model(&Card{}).Where("id = ? AND board_id = ?", msg.CardId, c.boardID).Update("tags", msg.Tags); result.Error != nil || result.RowsAffected == 0 {
+					c.sendError("Could not save task. It may have been deleted. Refresh and try again.")
+					continue
+				}
 			case "DELETE_CARD":
-				c.db.Where("id = ? AND board_id = ?", msg.CardId, c.boardID).Delete(&Card{})
+				if result := c.db.Where("id = ? AND board_id = ?", msg.CardId, c.boardID).Delete(&Card{}); result.Error != nil || result.RowsAffected == 0 {
+					c.sendError("Could not save task. It may have been deleted. Refresh and try again.")
+					continue
+				}
 			case "UPDATE_BOARD_NAME":
 				c.db.Model(&Board{}).Where("id = ?", c.boardID).Update("name", msg.BoardName)
 			case "UPDATE_BOARD_BACKGROUND":
@@ -570,6 +621,20 @@ func serveWs(hub *Hub, db *gorm.DB, w http.ResponseWriter, r *http.Request) {
 			} else {
 				db.Model(&member).Update("last_seen", time.Now())
 			}
+		}
+	}
+
+	var accessibleBoard Board
+	if db.First(&accessibleBoard, "id = ?", boardID).Error != nil {
+		conn.Close()
+		return
+	}
+	role := resolveBoardRole(db, boardID, accessibleBoard.OwnerID, userID)
+	if accessibleBoard.AccessLevel == "private" && role != "owner" && role != "edit" && role != "view" {
+		inviteBoard, _, err := VerifyBoardInviteToken(r.URL.Query().Get("inviteToken"))
+		if err != nil || inviteBoard != boardID {
+			conn.Close()
+			return
 		}
 	}
 

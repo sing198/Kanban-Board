@@ -11,6 +11,7 @@ import {
   Search,
   Star,
   FolderKanban,
+  Layers3,
   LayoutGrid,
   List as ListIcon,
   Sun,
@@ -20,6 +21,7 @@ import {
   Check
 } from "lucide-react";
 import { API_URL } from "../config";
+import WorkspaceSidebar from "../components/WorkspaceSidebar";
 import { useNotifications } from "../useNotifications";
 
 type UserPresence = {
@@ -64,6 +66,11 @@ function AvatarImage({ src, name, className, title }: { src: string; name: strin
 
 export default function Dashboard() {
   const { user, login, logout } = useAuth();
+  const handleWorkspaceLogout = () => {
+    if (user?.email === "guest@kanban.demo" && !window.confirm("Log out of your guest session? You may lose access to your guest boards. Cancel to keep working or sign in to save them.")) return;
+    logout();
+  };
+
   const { theme, toggleTheme } = useTheme();
   const { notifications, unreadCount, respondToAccess } = useNotifications();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -391,35 +398,23 @@ export default function Dashboard() {
   }
 
   return (
-    <div className={`min-h-screen font-sans flex flex-col transition-colors duration-200 selection:bg-blue-500/20 ${theme === "dark" ? "bg-[#090d16] text-[#f8fafc]" : "bg-[#f8fafc] text-slate-900"
+    <div className={`board-workspace dashboard-workspace min-h-screen font-sans flex flex-col transition-colors duration-200 selection:bg-blue-500/20 ${theme === "dark" ? "bg-[#090d16] text-[#f8fafc]" : "bg-[#f8fafc] text-slate-900"
       }`}>
 
+      <WorkspaceSidebar onLogout={handleWorkspaceLogout} user={user} activePage="dashboard" boardCount={boards.length} role="Personal workspace"
+        onOverview={() => window.scrollTo({ top: 0 })} onAllBoards={() => { setActiveTab("all"); setSearchQuery(""); }}>
+        <div className="sidebar-section-label">QUICK ACCESS</div>
+        <button className="sidebar-stream" onClick={() => setActiveTab("my")}><FolderKanban size={15} /> My boards</button>
+        <button className="sidebar-stream" onClick={() => setActiveTab("shared")}><Layers3 size={15} /> Shared with me</button>
+        <button className="sidebar-stream" onClick={() => setActiveTab("starred")}><Star size={15} /> Starred</button>
+      </WorkspaceSidebar>
       {demoError && <div role="alert" className="bg-rose-100 text-rose-900 p-4">{demoError} <button onClick={startDemo} disabled={isStartingDemo} className="underline">Retry demo</button></div>}
       {isStartingDemo && <div role="status" className="bg-blue-100 text-blue-900 p-4">Preparing your demo board…</div>}
       {/* HEADER */}
-      <header className={`px-8 py-4 border-b flex items-center justify-between backdrop-blur-md sticky top-0 z-20 transition-colors ${theme === "dark" ? "bg-[#0f172a]/95 border-[#1e293b]" : "bg-white border-gray-200 shadow-xs"
+      <header className={`board-topbar dashboard-topbar px-8 py-4 border-b flex items-center justify-between backdrop-blur-md sticky top-0 z-20 transition-colors ${theme === "dark" ? "bg-[#0f172a]/95 border-[#1e293b]" : "bg-white border-gray-200 shadow-xs"
         }`}>
-        <div className="flex items-center gap-3.5 group cursor-pointer select-none">
-          {/* Sleek Gradient Glowing Logo Badge */}
-          <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-[#2563eb] via-[#4f46e5] to-[#38bdf8] p-[1.5px] shadow-md shadow-blue-500/20 group-hover:shadow-blue-500/40 group-hover:scale-105 transition-all duration-200">
-            <div className="w-full h-full bg-[#0f172a] rounded-[14px] flex items-center justify-center p-1.5 gap-0.5">
-              <div className="w-1.5 h-full rounded-xs bg-gradient-to-b from-blue-400 to-blue-600 shadow-2xs" />
-              <div className="w-1.5 h-3/4 rounded-xs bg-gradient-to-b from-sky-300 to-indigo-500 shadow-2xs" />
-              <div className="w-1.5 h-1/2 rounded-xs bg-gradient-to-b from-indigo-400 to-purple-500 shadow-2xs" />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <h1 className="text-xl font-extrabold tracking-tight flex items-center">
-              <span className="bg-gradient-to-r from-[#2563eb] via-[#4f46e5] to-[#0284c7] dark:from-white dark:via-slate-100 dark:to-sky-400 bg-clip-text text-transparent">
-                Kanban
-              </span>
-              <span className="text-slate-800 dark:text-slate-200 ml-1">Board</span>
-            </h1>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
+        <div className="board-brand flex items-center gap-3"><span className="mobile-workspace-symbol"><Layers3 size={22} /></span><h1 className="board-title">All boards</h1></div>
+        <div className="dashboard-top-actions flex items-center gap-3">
           {/* Theme Switcher Button */}
           <button
             onClick={toggleTheme}
@@ -432,17 +427,7 @@ export default function Dashboard() {
             {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
           </button>
 
-          <button
-            onClick={createNewBoard}
-            className={`px-4 py-2 rounded-xl text-white text-xs font-bold flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer ${theme === "dark"
-              ? "bg-[#2563eb] hover:bg-[#1d4ed8] shadow-md shadow-blue-500/20"
-              : "bg-[#4262ff] hover:bg-[#3551d8] shadow-md shadow-blue-500/20"
-              }`}
-          >
-            <Plus size={16} /> Create New Board
-          </button>
-
-          <div className={`flex items-center gap-3 px-3.5 py-1.5 rounded-xl border ${theme === "dark" ? "bg-[#1e293b] border-[#334155]" : "bg-gray-50 border-gray-200"
+          <div className={`workspace-mobile-account flex items-center gap-3 px-3.5 py-1.5 rounded-xl border ${theme === "dark" ? "bg-[#1e293b] border-[#334155]" : "bg-gray-50 border-gray-200"
             }`}>
             <AvatarImage
               src={user.avatarUrl}
@@ -557,10 +542,9 @@ export default function Dashboard() {
 
           <button
             onClick={() => {
-              logout();
-              navigate("/");
+              handleWorkspaceLogout();
             }}
-            className={`p-2 rounded-xl border transition-colors ${theme === "dark"
+            className={`workspace-mobile-account p-2 rounded-xl border transition-colors ${theme === "dark"
               ? "bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-transparent"
               : "bg-gray-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border-gray-200"
               }`}
@@ -571,44 +555,52 @@ export default function Dashboard() {
         </div>
       </header>
 
+      <section className="board-overview" aria-label="Workspace overview">
+        <div className="overview-copy"><div className="board-eyebrow"><span /> YOUR SPACE TO MAKE THINGS HAPPEN</div><h2>My workspace</h2><p>All your projects, one place. Pick a board and keep things moving.</p><div className="overview-meta"><span><Layers3 size={14} /> {boards.length} boards</span><span><Star size={14} /> {boards.filter(b => starredIds.includes(b.ID)).length} starred</span></div></div>
+        <div className="overview-action"><button className="new-task-button" onClick={createNewBoard}><Plus size={17} /> New board</button><div className="overview-task-count"><strong>{boards.reduce((n,b) => n + (b.Cards?.length || 0), 0)}</strong><span>tasks across your boards</span></div></div>
+      </section>
       {/* MAIN CONTAINER */}
-      <main className="max-w-7xl w-full mx-auto px-8 py-8 flex-1 space-y-8">
+      <main className="dashboard-main max-w-7xl w-full mx-auto px-8 py-8 flex-1 space-y-8">
 
         {/* ACTION BAR: SEARCH, TABS, VIEW TOGGLE */}
-        <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b ${theme === "dark" ? "border-[#1e293b]" : "border-gray-200"
+        <div className={`dashboard-controls flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b ${theme === "dark" ? "border-[#1e293b]" : "border-gray-200"
           }`}>
 
           {/* Tabs */}
-          <div className={`flex items-center gap-2 w-fit flex-wrap p-1.5 rounded-2xl border ${theme === "dark" ? "bg-[#0f172a] border-[#1e293b]" : "bg-gray-100/80 border-gray-200"
+          <div className={`dashboard-tabs flex items-center gap-2 w-fit flex-wrap p-1.5 rounded-2xl border ${theme === "dark" ? "bg-[#0f172a] border-[#1e293b]" : "bg-gray-100/80 border-gray-200"
             }`}>
             <button
+              aria-pressed={activeTab === "all"}
               onClick={() => setActiveTab("all")}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "all"
                 ? theme === "dark" ? "bg-[#2563eb] text-white shadow-md shadow-blue-500/20" : "bg-[#4262ff] text-white shadow-md shadow-blue-500/20"
                 : theme === "dark" ? "bg-[#1e293b] border border-[#334155] text-slate-300 hover:bg-[#334155]" : "bg-white border border-gray-200 text-slate-600 hover:bg-gray-50 hover:text-slate-900"
                 }`}
             >
-              All Boards ({boards.length})
+              All boards ({boards.length})
             </button>
             <button
+              aria-pressed={activeTab === "my"}
               onClick={() => setActiveTab("my")}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "my"
                 ? theme === "dark" ? "bg-[#2563eb] text-white shadow-md shadow-blue-500/20" : "bg-[#4262ff] text-white shadow-md shadow-blue-500/20"
                 : theme === "dark" ? "bg-[#1e293b] border border-[#334155] text-slate-300 hover:bg-[#334155]" : "bg-white border border-gray-200 text-slate-600 hover:bg-gray-50 hover:text-slate-900"
                 }`}
             >
-              👑 My Boards ({boards.filter(b => b.IsOwner).length})
+              My boards ({boards.filter(b => b.IsOwner).length})
             </button>
             <button
+              aria-pressed={activeTab === "shared"}
               onClick={() => setActiveTab("shared")}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "shared"
                 ? theme === "dark" ? "bg-[#2563eb] text-white shadow-md shadow-blue-500/20" : "bg-[#4262ff] text-white shadow-md shadow-blue-500/20"
                 : theme === "dark" ? "bg-[#1e293b] border border-[#334155] text-slate-300 hover:bg-[#334155]" : "bg-white border border-gray-200 text-slate-600 hover:bg-gray-50 hover:text-slate-900"
                 }`}
             >
-              🤝 Shared with Me ({boards.filter(b => !b.IsOwner).length})
+              Shared with me ({boards.filter(b => !b.IsOwner).length})
             </button>
             <button
+              aria-pressed={activeTab === "starred"}
               onClick={() => setActiveTab("starred")}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeTab === "starred"
                 ? theme === "dark" ? "bg-[#2563eb] text-white shadow-md shadow-blue-500/20" : "bg-[#4262ff] text-white shadow-md shadow-blue-500/20"
@@ -628,7 +620,8 @@ export default function Dashboard() {
               <Search className={`absolute left-3.5 top-2.5 ${theme === "dark" ? "text-slate-400" : "text-slate-400"}`} size={16} />
               <input
                 type="text"
-                placeholder="Search boards..."
+                aria-label="Search boards"
+                placeholder="Search boards…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`w-full rounded-xl pl-10 pr-4 py-2 text-xs focus:outline-none transition-colors ${theme === "dark"
@@ -642,6 +635,7 @@ export default function Dashboard() {
             <div className={`flex items-center rounded-xl p-1 shadow-xs border ${theme === "dark" ? "bg-[#0f172a] border-[#1e293b]" : "bg-white border-gray-200"
               }`}>
               <button
+                aria-pressed={viewMode === "grid"}
                 onClick={() => setViewMode("grid")}
                 className={`p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer ${viewMode === "grid"
                   ? theme === "dark" ? "bg-[#1e293b] text-[#38bdf8] font-bold" : "bg-gray-100 text-[#4262ff] font-bold"
@@ -652,6 +646,7 @@ export default function Dashboard() {
                 <LayoutGrid size={16} />
               </button>
               <button
+                aria-pressed={viewMode === "list"}
                 onClick={() => setViewMode("list")}
                 className={`p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer ${viewMode === "list"
                   ? theme === "dark" ? "bg-[#1e293b] text-[#38bdf8] font-bold" : "bg-gray-100 text-[#4262ff] font-bold"
@@ -667,7 +662,7 @@ export default function Dashboard() {
 
         {/* BOARD LISTING */}
         {isLoadingBoards ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="dashboard-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {[1, 2, 3, 4].map(n => (
               <div key={n} className={`h-56 rounded-2xl p-5 border animate-pulse flex flex-col justify-between ${theme === "dark" ? "bg-[#1e293b]/60 border-[#334155]" : "bg-white border-gray-200"
                 }`}>
@@ -680,35 +675,35 @@ export default function Dashboard() {
             ))}
           </div>
         ) : filteredBoards.length === 0 ? (
-          <div className={`text-center py-20 border-2 border-dashed rounded-3xl ${theme === "dark" ? "border-[#1e293b] bg-[#0f172a]/50" : "border-gray-200 bg-white/60"
+          <div className={`dashboard-empty text-center py-20 border-2 border-dashed rounded-3xl ${theme === "dark" ? "border-[#1e293b] bg-[#0f172a]/50" : "border-gray-200 bg-white/60"
             }`}>
             <FolderKanban className={`mx-auto mb-3 ${theme === "dark" ? "text-slate-500" : "text-slate-400"}`} size={48} />
             <h3 className={`text-lg font-bold mb-1 ${theme === "dark" ? "text-slate-200" : "text-slate-800"}`}>No boards found</h3>
             <p className={`text-xs max-w-sm mx-auto mb-6 ${theme === "dark" ? "text-slate-400" : "text-slate-500"}`}>
-              {searchQuery ? "No boards match your search filter." : "Create your first Kanban board to start managing tasks."}
+              {searchQuery ? "No boards match your search. Try a different name." : activeTab === "starred" ? "Star a board to find it here quickly." : activeTab === "shared" ? "Boards shared with you will appear here." : "Create a board to start managing tasks."}
             </p>
             <button
-              onClick={createNewBoard}
+              onClick={searchQuery || activeTab !== "all" ? () => { setSearchQuery(""); setActiveTab("all"); } : createNewBoard}
               className={`px-5 py-2.5 rounded-xl text-white text-xs font-bold transition-all hover:scale-105 active:scale-95 ${theme === "dark" ? "bg-[#2563eb] hover:bg-[#1d4ed8] shadow-md shadow-blue-500/20" : "bg-[#4262ff] hover:bg-[#3551d8] shadow-md shadow-blue-500/20"
                 }`}
             >
-              + Create New Board
+              {searchQuery || activeTab !== "all" ? "View all boards" : "+ Create New Board"}
             </button>
           </div>
         ) : viewMode === "grid" ? (
           /* GRID VIEW */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="dashboard-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredBoards.map(board => {
               const isStarred = starredIds.includes(board.ID);
               return (
                 <Link key={board.ID} to={`/b/${board.ID}`} className="block group">
-                  <div className={`h-56 rounded-2xl p-5 flex flex-col justify-between border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg relative overflow-hidden shadow-xs ${theme === "dark"
+                  <div className={`dashboard-board-card h-56 rounded-2xl p-5 flex flex-col justify-between border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg relative overflow-hidden shadow-xs ${theme === "dark"
                     ? "bg-[#1e293b] border-[#334155] group-hover:border-blue-500/50"
                     : "bg-white border-gray-200 group-hover:border-blue-500/50"
                     }`}>
 
                     {/* Top Card Thumbnail Header */}
-                    <div className={`h-28 rounded-xl p-3 border relative flex items-center justify-center overflow-hidden ${theme === "dark"
+                    <div className={`dashboard-board-preview h-28 rounded-xl p-3 border relative flex items-center justify-center overflow-hidden ${theme === "dark"
                       ? "bg-gradient-to-br from-slate-900 via-[#0f172a] to-blue-950/30 border-[#334155]"
                       : "bg-gradient-to-br from-amber-100/70 via-slate-100 to-blue-50/50 border-gray-100"
                       }`}>
@@ -763,7 +758,7 @@ export default function Dashboard() {
                           ? theme === "dark" ? "bg-blue-500/20 text-blue-300 border border-blue-500/30" : "bg-blue-50 text-blue-700 border border-blue-200"
                           : theme === "dark" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" : "bg-amber-50 text-amber-700 border border-amber-200"
                           }`}>
-                          {board.IsOwner ? "👑 My Board" : "🤝 Shared"}
+                          {board.IsOwner ? "Owner" : "Shared"}
                         </span>
                       </div>
                     </div>
@@ -771,7 +766,7 @@ export default function Dashboard() {
                     <div className={`flex items-center justify-between text-xs pt-2 border-t ${theme === "dark" ? "border-[#334155] text-slate-400" : "border-gray-100 text-slate-500"
                       }`}>
                       <span className="text-[11px] font-semibold">
-                        {board.Cards?.length || 0} cards
+                        {board.Cards?.length || 0} tasks
                       </span>
 
                       {/* Active Online Users Avatar Stack */}
@@ -784,10 +779,10 @@ export default function Dashboard() {
           </div>
         ) : (
           /* LIST VIEW */
-          <div className={`border rounded-2xl overflow-hidden shadow-xs ${theme === "dark" ? "bg-[#1e293b] border-[#334155]" : "bg-white border-gray-200"
+          <div className={`dashboard-list border rounded-2xl overflow-hidden shadow-xs ${theme === "dark" ? "bg-[#1e293b] border-[#334155]" : "bg-white border-gray-200"
             }`}>
             {/* Table Header */}
-            <div className={`grid grid-cols-12 px-6 py-3 border-b text-xs font-bold ${theme === "dark" ? "bg-[#0f172a]/60 border-[#334155] text-slate-400" : "bg-gray-50 border-gray-100 text-slate-500"
+            <div className={`dashboard-list-heading grid grid-cols-12 px-6 py-3 border-b text-xs font-bold ${theme === "dark" ? "bg-[#0f172a]/60 border-[#334155] text-slate-400" : "bg-gray-50 border-gray-100 text-slate-500"
               }`}>
               <div className="col-span-5">Name</div>
               <div className="col-span-3 text-center">Online users</div>
@@ -799,7 +794,7 @@ export default function Dashboard() {
               {filteredBoards.map(board => {
                 const isStarred = starredIds.includes(board.ID);
                 return (
-                  <Link key={board.ID} to={`/b/${board.ID}`} className={`px-6 py-4 grid grid-cols-12 items-center transition-colors group ${theme === "dark" ? "hover:bg-[#0f172a]" : "hover:bg-blue-50/40"
+                  <Link key={board.ID} to={`/b/${board.ID}`} className={`dashboard-list-row px-6 py-4 grid grid-cols-12 items-center transition-colors group ${theme === "dark" ? "hover:bg-[#0f172a]" : "hover:bg-blue-50/40"
                     }`}>
                     {/* Name Column */}
                     <div className="col-span-5 flex items-center gap-3">
@@ -812,7 +807,7 @@ export default function Dashboard() {
                           }`}>
                           {board.Name || "Untitled Board"}
                         </h4>
-                        <p className={`text-[11px] ${theme === "dark" ? "text-slate-400" : "text-slate-500"}`}>{board.Cards?.length || 0} cards</p>
+                        <p className={`text-[11px] ${theme === "dark" ? "text-slate-400" : "text-slate-500"}`}>{board.Cards?.length || 0} tasks</p>
                       </div>
                     </div>
 
@@ -827,7 +822,7 @@ export default function Dashboard() {
                         ? theme === "dark" ? "bg-blue-500/20 text-blue-300 border border-blue-500/30" : "bg-blue-50 text-blue-700 border border-blue-200"
                         : theme === "dark" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" : "bg-amber-50 text-amber-700 border border-amber-200"
                         }`}>
-                        {board.IsOwner ? "👑 My Board" : "🤝 Shared"}
+                        {board.IsOwner ? "Owner" : "Shared"}
                       </span>
                     </div>
 
@@ -964,7 +959,7 @@ export default function Dashboard() {
             </div>
 
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed bg-rose-500/5 p-3.5 rounded-xl border border-rose-500/10">
-              Are you sure you want to delete <strong className="text-slate-800 dark:text-slate-100 font-bold">"{deleteModalData.name}"</strong>? All lists, cards, and data inside this board will be permanently removed.
+              Are you sure you want to delete <strong className="text-slate-800 dark:text-slate-100 font-bold">"{deleteModalData.name}"</strong>? All columns, tasks, and data inside this board will be permanently removed.
             </p>
 
             <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
