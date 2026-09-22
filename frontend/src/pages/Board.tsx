@@ -26,7 +26,7 @@ import { useAuth } from "../useAuth";
 import { useTheme } from "../useTheme";
 import { useNotifications } from "../useNotifications";
 import { API_URL } from "../config";
-import WorkspaceSidebar from "../components/WorkspaceSidebar";
+import WorkspaceSidebar, { KanbanMark } from "../components/WorkspaceSidebar";
 
 function AvatarImage({ src, name, className, title }: { src: string; name: string; className: string; title?: string }) {
   const [failed, setFailed] = useState(false);
@@ -1295,7 +1295,7 @@ export default function Board() {
             aria-label="Go to dashboard"
             title="Go to Dashboard"
           >
-            <span className="mobile-workspace-symbol"><Layers3 size={22} /></span>
+            <span className="mobile-workspace-symbol"><KanbanMark /></span>
           </button>
 
           <div className={`h-4 w-px ${theme === "dark" ? "bg-[#1e293b]" : "bg-gray-200"}`} />

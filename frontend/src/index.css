@@ -70,8 +70,12 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 .board-workspace button:disabled { opacity:.45; cursor:not-allowed; }
 .workspace-sidebar { position:fixed; inset:0 auto 0 0; width:232px; padding:30px 20px 18px; background:var(--board-panel); border-right:1px solid var(--board-line); z-index:45; display:flex; flex-direction:column; overflow-y:auto; }
 .workspace-logo { display:flex; align-items:center; gap:10px; font-size:25px; font-weight:800; letter-spacing:-1.3px; text-decoration:none; }
-.workspace-logo > span:first-child { display:grid; place-items:center; height:35px; width:35px; color:white; background:#4262ff; border-radius:11px; box-shadow:0 4px 10px #4262ff24; }
-.workspace-logo .workspace-logo-dot { margin-left:-9px; color:#4262ff; }
+/* Original three-column brand mark, shared across workspace navigation. */
+.kanban-mark { display:flex; align-items:center; justify-content:center; gap:3px; width:36px; height:36px; flex-shrink:0; padding:7px; border:2px solid #4262ff; border-radius:12px; background:#0f172a; box-shadow:0 2px 6px #4262ff40; }
+.kanban-mark > span { width:5px; border-radius:2px; }
+.kanban-mark > span:nth-child(1) { height:22px; background:linear-gradient(#60a5fa,#2563eb); }
+.kanban-mark > span:nth-child(2) { height:18px; background:linear-gradient(#7dd3fc,#6366f1); }
+.kanban-mark > span:nth-child(3) { height:12px; background:linear-gradient(#a5b4fc,#a855f7); }
 .workspace-switcher { margin-top:32px; border:1px solid var(--board-line); padding:11px; border-radius:11px; display:flex; align-items:center; gap:10px; }
 .workspace-avatar { width:31px; height:31px; border-radius:9px; background:#eff6ff; color:#3551d8; display:grid; place-items:center; font-size:12px; font-weight:750; flex-shrink:0; }
 .workspace-switcher strong, .sidebar-profile strong { display:block; font-size:11px; font-weight:650; }
@@ -218,7 +222,7 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 .sidebar-stream { width:100%; }
 #board-overview, #board-content { scroll-margin-top:85px; }
 /* Shared workspace chrome, used by the dashboard and board. */
-.mobile-workspace-symbol { display:none; width:32px; height:32px; place-items:center; background:#4262ff; border-radius:10px; color:white; flex-shrink:0; }
+.mobile-workspace-symbol { display:none; width:32px; height:32px; place-items:center; background:transparent; border-radius:10px; color:white; flex-shrink:0; }
 .dashboard-main { max-width:none; padding:0 36px 40px; }
 .dashboard-top-actions { flex-shrink:0; }
 .dashboard-top-actions > button { padding:7px; }
@@ -328,3 +332,5 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 .presence-count { color:var(--board-muted); font-size:10px; white-space:nowrap; }
 .presence-avatars > span:focus-visible { outline:2px solid var(--board-accent); outline-offset:2px; }
 @media(max-width:520px) { .presence-count { display:none; } .presence-avatar, .presence-overflow { width:24px; height:24px; } }
+
+.mobile-workspace-symbol .kanban-mark { width:32px; height:32px; padding:5px; border-radius:10px; }

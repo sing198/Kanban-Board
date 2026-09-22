@@ -13,8 +13,12 @@ type Props = {
   children?: ReactNode;
 };
 
+export function KanbanMark() {
+  return <span className="kanban-mark" aria-hidden="true"><span /><span /><span /></span>;
+}
+
 export function WorkspaceLogo({ onClick }: { onClick: () => void }) {
-  return <button className="workspace-logo" onClick={onClick} aria-label="Kanban workspace"><span><Layers3 size={23} /></span>kanban<span className="workspace-logo-dot">.</span></button>;
+  return <button className="workspace-logo" onClick={onClick} aria-label="Kanban workspace"><KanbanMark />Kanban</button>;
 }
 
 export default function WorkspaceSidebar({ user, activePage, onAllBoards, onOverview, role, boardCount, cardCount, children, onLogout }: Props) {

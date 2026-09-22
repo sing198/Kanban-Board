@@ -21,7 +21,7 @@ import {
   Check
 } from "lucide-react";
 import { API_URL } from "../config";
-import WorkspaceSidebar from "../components/WorkspaceSidebar";
+import WorkspaceSidebar, { KanbanMark } from "../components/WorkspaceSidebar";
 import { useNotifications } from "../useNotifications";
 
 type UserPresence = {
@@ -413,7 +413,7 @@ export default function Dashboard() {
       {/* HEADER */}
       <header className={`board-topbar dashboard-topbar px-8 py-4 border-b flex items-center justify-between backdrop-blur-md sticky top-0 z-20 transition-colors ${theme === "dark" ? "bg-[#0f172a]/95 border-[#1e293b]" : "bg-white border-gray-200 shadow-xs"
         }`}>
-        <div className="board-brand flex items-center gap-3"><span className="mobile-workspace-symbol"><Layers3 size={22} /></span><h1 className="board-title">All boards</h1></div>
+        <div className="board-brand flex items-center gap-3"><span className="mobile-workspace-symbol"><KanbanMark /></span><h1 className="board-title">All boards</h1></div>
         <div className="dashboard-top-actions flex items-center gap-3">
           {/* Theme Switcher Button */}
           <button
